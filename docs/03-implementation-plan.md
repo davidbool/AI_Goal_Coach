@@ -8,6 +8,7 @@
 ## Related Documents
 - Product scope and UX: [01-product-and-scope.md](./01-product-and-scope.md)
 - Technical design: [02-technical-spec.md](./02-technical-spec.md)
+- Agent ownership and handoff rules: [04-agent-execution-instructions.md](./04-agent-execution-instructions.md)
 
 ## Phase Plan (0-6)
 

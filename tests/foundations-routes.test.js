@@ -1,0 +1,171 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import { ApiContracts, parseApiResponse } from "../src/contracts/schemas.js";
+import { createServer } from "../src/server/createServer.js";
+import { startServer } from "./helpers/httpTestClient.js";
+
+test("all MVP routes exist and return contract-safe mock payloads", async (t) => {
+  const now = new Date("2026-03-26T12:00:00.000Z");
+  const { server } = createServer({ nowProvider: () => now });
+  const client = await startServer(server);
+
+  t.after(async () => {
+    await client.stop();
+  });
+
+  const listGoals = await client.request("/v1/goals", { method: "GET" });
+  assert.equal(listGoals.status, 200);
+  parseApiResponse("list_goals", listGoals.body);
+
+  const createGoal = await client.request("/v1/goals", {
+    method: "POST",
+    body: {
+      title: "Run 5km three times per week by 2026-10-01"
+    }
+  });
+  assert.equal(createGoal.status, 201);
+  parseApiResponse("create_goal", createGoal.body);
+  const createdGoalId = createGoal.body.goal.id;
+
+  const activate = await client.request(`/v1/goals/${createdGoalId}/activate`, { method: "POST", body: {} });
+  assert.equal(activate.status, 200);
+  parseApiResponse("activate_goal", activate.body);
+
+  const patchStatus = await client.request(`/v1/goals/${createdGoalId}/status`, {
+    method: "PATCH",
+    body: { status: "active" }
+  });
+  assert.equal(patchStatus.status, 200);
+  parseApiResponse("patch_goal_status", patchStatus.body);
+
+  const clarifications = await client.request(`/v1/goals/${createdGoalId}/clarifications`, {
+    method: "POST",
+    body: {
+      answers: [
+        {
+          question_text: "What measurable target proves success?",
+          answer_text: "Run 5km in under 30 minutes"
+        }
+      ]
+    }
+  });
+  assert.equal(clarifications.status, 200);
+  parseApiResponse("submit_clarifications", clarifications.body);
+
+  const assessment = await client.request(`/v1/goals/${createdGoalId}/assessment`, {
+    method: "POST",
+    body: {
+      current_level: "beginner",
+      weekly_minutes_available: 180,
+      target_date: "2026-10-01"
+    }
+  });
+  assert.equal(assessment.status, 200);
+  parseApiResponse("submit_assessment", assessment.body);
+
+  const generate = await client.request(`/v1/goals/${createdGoalId}/plans/generate`, {
+    method: "POST",
+    body: {}
+  });
+  assert.equal(generate.status, 202);
+  parseApiResponse("generate_plan", generate.body);
+
+  const status = await client.request(`/v1/goals/${createdGoalId}/plans/status`, { method: "GET" });
+  assert.equal(status.status, 200);
+  parseApiResponse("plan_status", status.body);
+
+  const activateSeedGoal = await client.request("/v1/goals/goal-1/activate", {
+    method: "POST",
+    body: {}
+  });
+  assert.equal(activateSeedGoal.status, 200);
+  parseApiResponse("activate_goal", activateSeedGoal.body);
+
+  const todayTasks = await client.request("/v1/goals/active/tasks/today", { method: "GET" });
+  assert.equal(todayTasks.status, 200);
+  parseApiResponse("today_tasks", todayTasks.body);
+  assert.ok(todayTasks.body.tasks.length > 0);
+  const [firstTask, secondTask] = todayTasks.body.tasks;
+
+  const complete = await client.request(`/v1/tasks/${firstTask.id}/complete`, {
+    method: "POST",
+    body: {
+      actual_minutes: firstTask.est_minutes
+    }
+  });
+  assert.equal(complete.status, 200);
+  parseApiResponse("complete_task", complete.body);
+
+  const skip = await client.request(`/v1/tasks/${(secondTask ?? firstTask).id}/skip`, {
+    method: "POST",
+    body: {}
+  });
+  assert.equal(skip.status, 200);
+  parseApiResponse("skip_task", skip.body);
+
+  const edit = await client.request(`/v1/tasks/${firstTask.id}`, {
+    method: "PATCH",
+    body: {
+      title: "Edited title",
+      est_minutes: 20
+    }
+  });
+  assert.equal(edit.status, 200);
+  parseApiResponse("edit_task", edit.body);
+
+  const softAdjust = await client.request("/v1/goals/active/soft-adjust", {
+    method: "POST",
+    body: {}
+  });
+  assert.equal(softAdjust.status, 200);
+  parseApiResponse("soft_adjust", softAdjust.body);
+
+  const milestone = await client.request("/v1/milestones/ms-1/confirm", {
+    method: "POST",
+    body: {}
+  });
+  assert.equal(milestone.status, 200);
+  parseApiResponse("confirm_milestone", milestone.body);
+
+  const adapt = await client.request("/v1/goals/active/adapt", {
+    method: "POST",
+    body: { triggered_by: "manual" }
+  });
+  assert.equal(adapt.status, 202);
+  parseApiResponse("adapt_goal", adapt.body);
+
+  const progress = await client.request("/v1/goals/active/progress", { method: "GET" });
+  assert.equal(progress.status, 200);
+  parseApiResponse("progress", progress.body);
+
+  const registerToken = await client.request("/v1/notifications/token", {
+    method: "POST",
+    body: {
+      token: "expo-token-foundation",
+      platform: "ios"
+    }
+  });
+  assert.equal(registerToken.status, 200);
+  parseApiResponse("register_notification_token", registerToken.body);
+
+  const preferences = await client.request("/v1/notifications/preferences", {
+    method: "PATCH",
+    body: {
+      max_push_per_day: 1
+    }
+  });
+  assert.equal(preferences.status, 200);
+  parseApiResponse("update_notification_preferences", preferences.body);
+
+  const reminder = await client.request("/v1/notifications/reminders/send", {
+    method: "POST",
+    body: {
+      reason: "daily_reminder"
+    }
+  });
+  assert.equal(reminder.status, 200);
+  parseApiResponse("send_reminder", reminder.body);
+
+  assert.equal(Object.keys(ApiContracts).length >= 18, true);
+});
