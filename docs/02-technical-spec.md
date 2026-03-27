@@ -8,6 +8,7 @@
 ## Related Documents
 - Product scope and UX policy: [01-product-and-scope.md](./01-product-and-scope.md)
 - Delivery phases and timeline: [03-implementation-plan.md](./03-implementation-plan.md)
+- Agent ownership and handoff instructions: [04-agent-execution-instructions.md](./04-agent-execution-instructions.md)
 
 ## System Architecture
 - Mobile client: onboarding UI, daily tasks, progress, notifications UX.

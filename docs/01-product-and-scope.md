@@ -8,6 +8,7 @@
 ## Related Documents
 - Technical implementation details: [02-technical-spec.md](./02-technical-spec.md)
 - Execution phases and delivery plan: [03-implementation-plan.md](./03-implementation-plan.md)
+- Agent ownership and handoff instructions: [04-agent-execution-instructions.md](./04-agent-execution-instructions.md)
 
 ## Product Summary
 AI Goal Coach is a mobile app that helps users achieve long-term goals by converting them into realistic daily and weekly actions. It behaves like a gentle coach: supportive, adaptive, and focused on consistency over intensity.
