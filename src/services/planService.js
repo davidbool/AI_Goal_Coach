@@ -1,4 +1,5 @@
 import { PlanState, SpecificityState } from "../contracts/constants.js";
+import { GeneratedPlanPayloadSchema } from "../contracts/schemas.js";
 import { conflict } from "../contracts/validators.js";
 import { generateId, nowIso } from "../repositories/inMemoryStore.js";
 
@@ -96,7 +97,21 @@ export class PlanService {
         goal.updated_at = nowIso(this.clock);
         job.completed_at = nowIso(this.clock);
       } else {
-        const plan = this.persistPlan(goal.id, job.payload);
+        const validatedPayload = GeneratedPlanPayloadSchema.safeParse(job.payload);
+
+        if (!validatedPayload.success) {
+          goal.plan_state = PlanState.FAILED;
+          goal.updated_at = nowIso(this.clock);
+          job.completed_at = nowIso(this.clock);
+
+          return {
+            goal_id: goal.id,
+            plan_state: goal.plan_state,
+            plan: null
+          };
+        }
+
+        const plan = this.persistPlan(goal.id, validatedPayload.data);
         goal.plan_state = PlanState.READY;
         goal.updated_at = nowIso(this.clock);
         job.completed_at = nowIso(this.clock);
