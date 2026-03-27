@@ -1,0 +1,22 @@
+{
+  "name": "ai-goal-coach",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test",
+    "prisma:validate": "DATABASE_URL=${DATABASE_URL:-postgresql://localhost:5432/goalcoach} prisma validate --schema prisma/schema.prisma",
+    "prisma:generate": "DATABASE_URL=${DATABASE_URL:-postgresql://localhost:5432/goalcoach} prisma generate --schema prisma/schema.prisma",
+    "prisma:migrate:dev": "prisma migrate dev --schema prisma/schema.prisma",
+    "prisma:migrate:deploy": "prisma migrate deploy --schema prisma/schema.prisma"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0"
+  },
+  "type": "module",
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "express": "^5.2.1",
+    "zod": "^3.23.8"
+  }
+}

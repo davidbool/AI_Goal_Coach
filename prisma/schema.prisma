@@ -1,0 +1,273 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GoalStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum SpecificityState {
+  SPECIFIC
+  NEEDS_CLARIFICATION
+}
+
+enum PlanState {
+  NEEDS_CLARIFICATION
+  GENERATING
+  DELAYED
+  READY
+  FAILED
+}
+
+enum FrameType {
+  SKILL_MASTERY
+  FITNESS_PERFORMANCE
+  PROJECT_OUTCOME
+}
+
+enum Feasibility {
+  REALISTIC
+  STRETCHED
+  UNREALISTIC
+}
+
+enum MilestoneStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+}
+
+enum TaskDifficulty {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum TaskSource {
+  PLAN
+  GENERATED
+  ADAPTED
+  MANUAL
+}
+
+enum AdjustmentSource {
+  PLAN
+  SAME_DAY_SOFT
+  FULL_ADAPT
+}
+
+enum TaskCompletionState {
+  COMPLETED
+  SKIPPED
+  PARTIAL
+}
+
+model User {
+  id                      String                  @id @default(cuid())
+  timezone                String
+  locale                  String
+  createdAt               DateTime                @default(now()) @map("created_at")
+  updatedAt               DateTime                @updatedAt @map("updated_at")
+  goals                   Goal[]
+  notificationPreference  NotificationPreference?
+  pushTokens              PushToken[]
+
+  @@map("users")
+}
+
+model Goal {
+  id               String            @id @default(cuid())
+  userId           String            @map("user_id")
+  title            String
+  status           GoalStatus
+  planState        PlanState?        @map("plan_state")
+  specificityState SpecificityState  @map("specificity_state")
+  specificityScore Float?            @map("specificity_score")
+  activeAt         DateTime?         @map("active_at")
+  activePlanId     String?           @map("active_plan_id")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clarifications  GoalClarification[]
+  assessment      GoalAssessment?
+  plans           Plan[]
+  tasks           Task[]
+  snapshots       ProgressSnapshot[]
+  streak          Streak?
+
+  @@index([userId, status])
+  @@map("goals")
+}
+
+model GoalClarification {
+  id           String   @id @default(cuid())
+  goalId       String   @map("goal_id")
+  questionText String   @map("question_text")
+  answerText   String   @map("answer_text")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId, createdAt])
+  @@map("goal_clarifications")
+}
+
+model GoalAssessment {
+  id                   String    @id @default(cuid())
+  goalId               String    @unique @map("goal_id")
+  currentLevel         String    @map("current_level")
+  weeklyMinutesAvailable Int     @map("weekly_minutes_available")
+  targetDate           DateTime? @map("target_date")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@map("goal_assessments")
+}
+
+model Plan {
+  id               String       @id @default(cuid())
+  goalId           String       @map("goal_id")
+  version          Int
+  frameType        FrameType    @map("frame_type")
+  feasibility      Feasibility
+  estimateMinWeeks Int          @map("estimate_min_weeks")
+  estimateMaxWeeks Int          @map("estimate_max_weeks")
+  confidence       Float
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  goal       Goal        @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  milestones Milestone[]
+  tasks      Task[]
+
+  @@unique([goalId, version])
+  @@index([goalId, createdAt])
+  @@map("plans")
+}
+
+model Milestone {
+  id              String          @id @default(cuid())
+  planId          String          @map("plan_id")
+  title           String
+  targetWeek      Int             @map("target_week")
+  successCriteria String          @map("success_criteria")
+  status          MilestoneStatus
+  userConfirmedAt DateTime?       @map("user_confirmed_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, targetWeek])
+  @@map("milestones")
+}
+
+model Task {
+  id               String            @id @default(cuid())
+  planId           String            @map("plan_id")
+  goalId           String            @map("goal_id")
+  scheduledDate    DateTime          @map("scheduled_date")
+  title            String
+  estMinutes       Int               @map("est_minutes")
+  difficulty       TaskDifficulty
+  required         Boolean           @default(true)
+  dimensionTag     String?           @map("dimension_tag")
+  source           TaskSource
+  manualLock       Boolean           @default(false) @map("manual_lock")
+  adjustmentSource AdjustmentSource? @map("adjustment_source")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  plan       Plan            @relation(fields: [planId], references: [id], onDelete: Cascade)
+  goal       Goal            @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  completion TaskCompletion?
+
+  @@index([goalId, scheduledDate])
+  @@index([planId, scheduledDate])
+  @@map("tasks")
+}
+
+model TaskCompletion {
+  id          String               @id @default(cuid())
+  taskId      String               @unique @map("task_id")
+  state       TaskCompletionState
+  actualMinutes Int?               @map("actual_minutes")
+  completedAt DateTime?            @map("completed_at")
+  createdAt   DateTime             @default(now()) @map("created_at")
+  updatedAt   DateTime             @updatedAt @map("updated_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("task_completions")
+}
+
+model ProgressSnapshot {
+  id            String   @id @default(cuid())
+  goalId        String   @map("goal_id")
+  date          DateTime
+  adherence7d   Float    @map("adherence_7d")
+  streakCurrent Int      @map("streak_current")
+  streakLongest Int      @map("streak_longest")
+  milestonesDone Int     @map("milestones_done")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@unique([goalId, date])
+  @@index([goalId, date])
+  @@map("progress_snapshots")
+}
+
+model Streak {
+  id              String   @id @default(cuid())
+  goalId          String   @unique @map("goal_id")
+  currentDays     Int      @map("current_days")
+  longestDays     Int      @map("longest_days")
+  lastSuccessDate DateTime? @map("last_success_date")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@map("streaks")
+}
+
+model NotificationPreference {
+  id               String   @id @default(cuid())
+  userId           String   @unique @map("user_id")
+  reminderTimeLocal String  @map("reminder_time_local")
+  quietHoursStart  String   @map("quiet_hours_start")
+  quietHoursEnd    String   @map("quiet_hours_end")
+  maxPushPerDay    Int      @map("max_push_per_day")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String
+  platform  String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, token])
+  @@map("push_tokens")
+}
