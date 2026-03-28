@@ -1,4 +1,4 @@
-import { ReminderReason } from "../../contracts/constants.js";
+import { DEFAULT_NOTIFICATION_PREFERENCES, ReminderReason } from "../../contracts/constants.js";
 import { getLocalDateParts, isWithinQuietHours, parseTimeHHMM, toLocalDateKey } from "../../utils/dateTime.js";
 
 function requirePatchObject(patch) {
@@ -104,6 +104,29 @@ async function hasReminderBeenSent(store, userId, goalId, reason) {
   }
 
   return false;
+}
+
+export function getEffectiveNotificationPreferences(preference = null) {
+  return {
+    reminder_time_local: preference?.reminder_time_local ?? DEFAULT_NOTIFICATION_PREFERENCES.reminder_time_local,
+    quiet_hours_start: preference?.quiet_hours_start ?? DEFAULT_NOTIFICATION_PREFERENCES.quiet_hours_start,
+    quiet_hours_end: preference?.quiet_hours_end ?? DEFAULT_NOTIFICATION_PREFERENCES.quiet_hours_end,
+    max_push_per_day: preference?.max_push_per_day ?? DEFAULT_NOTIFICATION_PREFERENCES.max_push_per_day
+  };
+}
+
+export async function getNotificationSettingsSnapshot(store, userId) {
+  const [preference, registered] = await Promise.all([
+    typeof store.getNotificationPreference === "function"
+      ? store.getNotificationPreference(userId)
+      : null,
+    hasPushToken(store, userId)
+  ]);
+
+  return {
+    ...getEffectiveNotificationPreferences(preference),
+    has_push_token: Boolean(registered)
+  };
 }
 
 export async function registerPushToken(store, userId, token, platform, now = new Date()) {

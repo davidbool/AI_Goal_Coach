@@ -1,4 +1,4 @@
-import { Text, View } from "react-native";
+import { Text, TextInput, View } from "react-native";
 
 import {
   createGoalSummary,
@@ -8,6 +8,7 @@ import {
 } from "../model.js";
 import {
   ActionButton,
+  ChoicePill,
   GoalRow,
   HeroBadge,
   HeroPanel,
@@ -22,12 +23,18 @@ export function DashboardScreen({
   goals,
   isBusy,
   localDateKey,
+  notificationDirty,
+  notificationDraft,
+  notifications,
   progress,
   today,
+  onChangeNotificationField,
   onCompleteTask,
   onConfirmMilestone,
   onCreateAnotherGoal,
   onRefresh,
+  onSaveNotifications,
+  onSelectNotificationMaxPush,
   onSkipTask,
   onSoftAdjust,
   onSwitchGoal
@@ -36,6 +43,9 @@ export function DashboardScreen({
   const adherenceRate = progress?.adherence?.completion_rate_7d ?? progress?.adherence_7d ?? 0;
   const adherenceWidth = `${Math.max(8, Math.round(adherenceRate * 100))}%`;
   const presentation = getDashboardPresentation({ localDateKey, today });
+  const tokenStatusCopy = notifications?.hasPushToken
+    ? "A push token is already registered for this account. Delivery setup stays out of scope in this slice."
+    : "No push token is registered yet. This dashboard only shows status, so token setup can wait.";
 
   return (
     <>
@@ -111,6 +121,92 @@ export function DashboardScreen({
             <ActionButton disabled={isBusy} label="Lighten today" onPress={onSoftAdjust} tone="secondary" />
           </>
         )}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Reminders</Text>
+        <Text style={styles.mutedCopy}>
+          Edit the effective reminder schedule here. Saving patches preferences and then refreshes bootstrap so the dashboard stays aligned with the server.
+        </Text>
+
+        <View style={styles.fieldGroup}>
+          <Text style={styles.fieldLabel}>Reminder time</Text>
+          <TextInput
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="numbers-and-punctuation"
+            maxLength={5}
+            onChangeText={(value) => onChangeNotificationField("reminderTimeLocal", value)}
+            placeholder="20:00"
+            placeholderTextColor="#8B7E73"
+            style={styles.input}
+            value={notificationDraft.reminderTimeLocal}
+          />
+        </View>
+
+        <View style={styles.formSplitRow}>
+          <View style={styles.formSplitItem}>
+            <Text style={styles.fieldLabel}>Quiet hours start</Text>
+            <TextInput
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="numbers-and-punctuation"
+              maxLength={5}
+              onChangeText={(value) => onChangeNotificationField("quietHoursStart", value)}
+              placeholder="22:00"
+              placeholderTextColor="#8B7E73"
+              style={styles.input}
+              value={notificationDraft.quietHoursStart}
+            />
+          </View>
+          <View style={styles.formSplitItem}>
+            <Text style={styles.fieldLabel}>Quiet hours end</Text>
+            <TextInput
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="numbers-and-punctuation"
+              maxLength={5}
+              onChangeText={(value) => onChangeNotificationField("quietHoursEnd", value)}
+              placeholder="07:00"
+              placeholderTextColor="#8B7E73"
+              style={styles.input}
+              value={notificationDraft.quietHoursEnd}
+            />
+          </View>
+        </View>
+
+        <View style={styles.fieldGroup}>
+          <Text style={styles.fieldLabel}>Max push per day</Text>
+          <View style={styles.pillWrap}>
+            {[1, 2].map((option) => (
+              <ChoicePill
+                key={option}
+                active={notificationDraft.maxPushPerDay === option}
+                disabled={isBusy}
+                label={`${option} / day`}
+                onPress={() => onSelectNotificationMaxPush(option)}
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.noteCard}>
+          <Text style={styles.noteTitle}>Push status</Text>
+          <Text style={styles.noteCopy}>{tokenStatusCopy}</Text>
+        </View>
+
+        {notificationDirty ? (
+          <Text style={styles.helperLine}>
+            Unsaved reminder edits stay in place while the rest of the dashboard refreshes.
+          </Text>
+        ) : null}
+
+        <ActionButton
+          disabled={isBusy || !notificationDirty}
+          label={notificationDirty ? "Save reminders" : "Reminders up to date"}
+          onPress={onSaveNotifications}
+          tone={notificationDirty ? "primary" : "muted"}
+        />
       </View>
 
       <View style={styles.card}>

@@ -8,8 +8,111 @@ function formatLocalDatePrefix(localDateKey) {
   return localDateKey ? `Local date: ${localDateKey}. ` : "";
 }
 
+const DEFAULT_NOTIFICATION_SETTINGS = Object.freeze({
+  reminderTimeLocal: "20:00",
+  quietHoursStart: "22:00",
+  quietHoursEnd: "07:00",
+  maxPushPerDay: 2,
+  hasPushToken: false
+});
+
+function isValidTimeHHMM(value) {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const match = /^(\d{2}):(\d{2})$/.exec(value.trim());
+
+  if (!match) {
+    return false;
+  }
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+
+  return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
+}
+
 export function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function createDefaultNotifications() {
+  return {
+    ...DEFAULT_NOTIFICATION_SETTINGS
+  };
+}
+
+export function normalizeNotifications(notifications = {}) {
+  return {
+    reminderTimeLocal:
+      notifications.reminder_time_local ??
+      notifications.reminderTimeLocal ??
+      DEFAULT_NOTIFICATION_SETTINGS.reminderTimeLocal,
+    quietHoursStart:
+      notifications.quiet_hours_start ??
+      notifications.quietHoursStart ??
+      DEFAULT_NOTIFICATION_SETTINGS.quietHoursStart,
+    quietHoursEnd:
+      notifications.quiet_hours_end ??
+      notifications.quietHoursEnd ??
+      DEFAULT_NOTIFICATION_SETTINGS.quietHoursEnd,
+    maxPushPerDay:
+      notifications.max_push_per_day ??
+      notifications.maxPushPerDay ??
+      DEFAULT_NOTIFICATION_SETTINGS.maxPushPerDay,
+    hasPushToken:
+      notifications.has_push_token ??
+      notifications.hasPushToken ??
+      DEFAULT_NOTIFICATION_SETTINGS.hasPushToken
+  };
+}
+
+export function createNotificationDraft(notifications = {}) {
+  const normalized = normalizeNotifications(notifications);
+
+  return {
+    reminderTimeLocal: normalized.reminderTimeLocal,
+    quietHoursStart: normalized.quietHoursStart,
+    quietHoursEnd: normalized.quietHoursEnd,
+    maxPushPerDay: normalized.maxPushPerDay
+  };
+}
+
+export function notificationDraftMatchesSettings(draft, notifications) {
+  const normalized = normalizeNotifications(notifications);
+
+  return (
+    draft.reminderTimeLocal === normalized.reminderTimeLocal &&
+    draft.quietHoursStart === normalized.quietHoursStart &&
+    draft.quietHoursEnd === normalized.quietHoursEnd &&
+    draft.maxPushPerDay === normalized.maxPushPerDay
+  );
+}
+
+export function validateNotificationDraft(draft) {
+  if (
+    !isValidTimeHHMM(draft.reminderTimeLocal) ||
+    !isValidTimeHHMM(draft.quietHoursStart) ||
+    !isValidTimeHHMM(draft.quietHoursEnd)
+  ) {
+    return "Use HH:MM time values like 20:00 or 07:30 for reminders and quiet hours.";
+  }
+
+  if (draft.maxPushPerDay !== 1 && draft.maxPushPerDay !== 2) {
+    return "Daily cap must stay set to 1 or 2 pushes per day.";
+  }
+
+  return null;
+}
+
+export function buildNotificationPreferencesPayload(draft) {
+  return {
+    reminder_time_local: draft.reminderTimeLocal.trim(),
+    quiet_hours_start: draft.quietHoursStart.trim(),
+    quiet_hours_end: draft.quietHoursEnd.trim(),
+    max_push_per_day: draft.maxPushPerDay
+  };
 }
 
 export function createEmptySnapshot() {
@@ -19,7 +122,8 @@ export function createEmptySnapshot() {
     goals: [],
     activeGoal: null,
     today: null,
-    progress: null
+    progress: null,
+    notifications: createDefaultNotifications()
   };
 }
 
@@ -30,7 +134,8 @@ export function normalizeBootstrap(bootstrap = {}) {
     goals: bootstrap.goals ?? [],
     activeGoal: bootstrap.active_goal ?? null,
     today: bootstrap.today ?? null,
-    progress: bootstrap.progress ?? null
+    progress: bootstrap.progress ?? null,
+    notifications: normalizeNotifications(bootstrap.notifications)
   };
 }
 

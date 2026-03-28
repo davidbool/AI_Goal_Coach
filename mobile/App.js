@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, SafeAreaView } from "react-native";
 import { StatusBar } from "expo-status-bar";
 
@@ -14,6 +14,7 @@ import {
   resetDemoSession,
   skipTask,
   softAdjustActiveGoal,
+  updateNotificationPreferences,
   submitAssessment,
   submitClarifications
 } from "./src/api/goalCoachApi.js";
@@ -26,13 +27,17 @@ import {
 } from "./src/storage/guestSession.js";
 import { FlowRouter } from "./src/features/coachFlow/FlowRouter.js";
 import {
+  buildNotificationPreferencesPayload,
+  createNotificationDraft,
   createEmptyComposer,
   createEmptySnapshot,
   createGenerationComposerState,
+  notificationDraftMatchesSettings,
   normalizeBootstrap,
   sleep,
   syncComposerWithPlanStatus,
-  toClarificationFields
+  toClarificationFields,
+  validateNotificationDraft
 } from "./src/features/coachFlow/model.js";
 import { DeveloperLab } from "./src/features/coachFlow/screens/DeveloperLab.js";
 import { WelcomeScreen } from "./src/features/coachFlow/screens/WelcomeScreen.js";
@@ -52,9 +57,22 @@ export default function App() {
   const [coachMessage, setCoachMessage] = useState("");
   const [devSessionInfo, setDevSessionInfo] = useState(null);
   const [snapshot, setSnapshot] = useState(createEmptySnapshot());
+  const [notificationDraft, setNotificationDraft] = useState(createNotificationDraft());
+  const [notificationDirty, setNotificationDirty] = useState(false);
   const [composer, setComposer] = useState(createEmptyComposer());
   const [generationScenario, setGenerationScenario] = useState("ready");
   const [devLabOpen, setDevLabOpen] = useState(false);
+  const notificationDirtyRef = useRef(false);
+
+  function setNotificationDirtyState(value) {
+    notificationDirtyRef.current = value;
+    setNotificationDirty(value);
+  }
+
+  function syncNotificationDraft(nextNotifications) {
+    setNotificationDraft(createNotificationDraft(nextNotifications));
+    setNotificationDirtyState(false);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -74,7 +92,7 @@ export default function App() {
 
         setSession(storedSession);
         setApiBaseUrlDraft(storedSession.apiBaseUrl);
-        await loadSnapshot(storedSession);
+        await loadSnapshot(storedSession, { rehydrateNotifications: true });
       } catch (error) {
         if (!cancelled) {
           setErrorMessage(error.message);
@@ -93,13 +111,20 @@ export default function App() {
     };
   }, []);
 
-  async function loadSnapshot(activeSession = session) {
+  async function loadSnapshot(activeSession = session, options = {}) {
     if (!activeSession) {
       return;
     }
 
+    const { rehydrateNotifications = false } = options;
     const bootstrap = await fetchAppBootstrap(activeSession.apiBaseUrl, activeSession.userId);
-    setSnapshot(normalizeBootstrap(bootstrap));
+    const normalized = normalizeBootstrap(bootstrap);
+
+    setSnapshot(normalized);
+
+    if (rehydrateNotifications || !notificationDirtyRef.current) {
+      syncNotificationDraft(normalized.notifications);
+    }
   }
 
   function resetComposer(nextTitle = "") {
@@ -139,7 +164,7 @@ export default function App() {
       setDevSessionInfo(seededSession);
       setCoachMessage("Your local guest workspace is ready. Let's define one goal worth acting on.");
       resetComposer("");
-      await loadSnapshot(nextSession);
+      await loadSnapshot(nextSession, { rehydrateNotifications: true });
     });
   }
 
@@ -157,7 +182,7 @@ export default function App() {
       await writeGuestSession(nextSession);
       setSession(nextSession);
       setCoachMessage("Saved. Future requests will use the updated API address.");
-      await loadSnapshot(nextSession);
+      await loadSnapshot(nextSession, { rehydrateNotifications: true });
     });
   }
 
@@ -178,6 +203,7 @@ export default function App() {
             setSnapshot(createEmptySnapshot());
             setGenerationScenario("ready");
             resetComposer("");
+            syncNotificationDraft();
             setErrorMessage("");
             setCoachMessage("");
             setDevLabOpen(false);
@@ -201,7 +227,7 @@ export default function App() {
       setDevSessionInfo(payload);
       setCoachMessage(`Loaded "${payload.scenario.replace(/_/g, " ")}" so we can design against a stable state.`);
       resetComposer("");
-      await loadSnapshot(session);
+      await loadSnapshot(session, { rehydrateNotifications: true });
     });
   }
 
@@ -246,6 +272,55 @@ export default function App() {
     setCoachMessage("No rush. We can come back to this goal whenever you want.");
     setErrorMessage("");
     resetComposer("");
+  }
+
+  function handleChangeNotificationField(field, value) {
+    setErrorMessage("");
+    setNotificationDraft((current) => {
+      const nextDraft = {
+        ...current,
+        [field]: value
+      };
+
+      setNotificationDirtyState(!notificationDraftMatchesSettings(nextDraft, snapshot.notifications));
+      return nextDraft;
+    });
+  }
+
+  function handleSelectNotificationMaxPush(maxPushPerDay) {
+    setErrorMessage("");
+    setNotificationDraft((current) => {
+      const nextDraft = {
+        ...current,
+        maxPushPerDay
+      };
+
+      setNotificationDirtyState(!notificationDraftMatchesSettings(nextDraft, snapshot.notifications));
+      return nextDraft;
+    });
+  }
+
+  async function handleSaveNotifications() {
+    if (!session) {
+      return;
+    }
+
+    const validationError = validateNotificationDraft(notificationDraft);
+
+    if (validationError) {
+      setErrorMessage(validationError);
+      return;
+    }
+
+    await runBusyAction("Saving reminder settings", async () => {
+      await updateNotificationPreferences(
+        session.apiBaseUrl,
+        session.userId,
+        buildNotificationPreferencesPayload(notificationDraft)
+      );
+      await loadSnapshot(session, { rehydrateNotifications: true });
+      setCoachMessage("Reminders saved. The dashboard is back in sync with your latest schedule.");
+    });
   }
 
   async function handleCreateGoal() {
@@ -551,6 +626,8 @@ export default function App() {
         >
           <FlowRouter
             composer={composer}
+            notificationDirty={notificationDirty}
+            notificationDraft={notificationDraft}
             snapshot={snapshot}
             isBusy={isBusy}
             onActivateGoal={handleActivateGoal}
@@ -558,6 +635,7 @@ export default function App() {
             onCancelComposer={handleCancelComposer}
             onChangeAssessment={handleAssessmentChange}
             onChangeGoalTitle={handleChangeGoalTitle}
+            onChangeNotificationField={handleChangeNotificationField}
             onClarificationChange={handleClarificationChange}
             onCompleteTask={handleCompleteTask}
             onConfirmMilestone={handleConfirmMilestone}
@@ -566,7 +644,9 @@ export default function App() {
             onRefreshGenerationStatus={handleRefreshGenerationStatus}
             onRefreshSnapshot={handleRefreshSnapshot}
             onRetryGeneration={handleRetryGeneration}
+            onSaveNotifications={handleSaveNotifications}
             onSelectGoalPrompt={handleSelectGoalPrompt}
+            onSelectNotificationMaxPush={handleSelectNotificationMaxPush}
             onSkipTask={handleSkipTask}
             onSoftAdjust={handleSoftAdjust}
             onSubmitClarifications={handleSubmitClarifications}

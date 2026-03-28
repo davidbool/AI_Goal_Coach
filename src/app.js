@@ -7,7 +7,12 @@ import { TaskDifficulty, TaskState } from "./contracts/constants.js";
 import { triggerFullAdaptation } from "./modules/m4/adaptationService.js";
 import { confirmMilestoneForActiveGoal } from "./modules/m4/milestoneService.js";
 import { buildProgressScreenModel, getActiveGoalProgress, recalculateStreak } from "./modules/m4/progressService.js";
-import { registerPushToken, sendReminderIfEligible, updateReminderPreferences } from "./modules/m5/notificationService.js";
+import {
+  getNotificationSettingsSnapshot,
+  registerPushToken,
+  sendReminderIfEligible,
+  updateReminderPreferences
+} from "./modules/m5/notificationService.js";
 import { createConfiguredStore } from "./repositories/storeFactory.js";
 import { createObservability } from "./observability/observability.js";
 import { createAuthMiddleware } from "./server/auth.js";
@@ -125,9 +130,10 @@ async function buildTodayTasksPayload(store, user, activeGoal, now) {
 async function buildAppBootstrapPayload(store, userId, now) {
   const user = await findUser(store, userId);
   const localDateKey = toLocalDateKey(now, user.timezone);
-  const [goals, activeGoal] = await Promise.all([
+  const [goals, activeGoal, notifications] = await Promise.all([
     store.listGoalsForUser(userId),
-    store.getActiveGoal(userId)
+    store.getActiveGoal(userId),
+    getNotificationSettingsSnapshot(store, userId)
   ]);
 
   if (!activeGoal) {
@@ -135,6 +141,7 @@ async function buildAppBootstrapPayload(store, userId, now) {
       user,
       local_date_key: localDateKey,
       goals,
+      notifications,
       active_goal: null,
       today: null,
       progress: null
@@ -149,6 +156,7 @@ async function buildAppBootstrapPayload(store, userId, now) {
     user,
     local_date_key: localDateKey,
     goals,
+    notifications,
     active_goal: activeGoal,
     today,
     progress

@@ -79,6 +79,13 @@ export const NotificationPlatform = Object.freeze({
   UNKNOWN: "unknown"
 });
 
+export const DEFAULT_NOTIFICATION_PREFERENCES = Object.freeze({
+  reminder_time_local: "20:00",
+  quiet_hours_start: "22:00",
+  quiet_hours_end: "07:00",
+  max_push_per_day: 2
+});
+
 export const JobType = Object.freeze({
   GENERATE_PLAN: "generate_plan",
   ADAPT_PLAN: "adapt_plan",

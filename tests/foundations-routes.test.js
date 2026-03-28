@@ -24,6 +24,8 @@ test("all MVP routes exist and return contract-safe mock payloads", async (t) =>
   assert.equal(appBootstrap.body.active_goal.id, "goal-1");
   assert.equal(appBootstrap.body.today.tasks.length > 0, true);
   assert.equal(appBootstrap.body.progress.goal_id, "goal-1");
+  assert.equal(appBootstrap.body.notifications.max_push_per_day, 2);
+  assert.equal(appBootstrap.body.notifications.has_push_token, false);
 
   const createGoal = await client.request("/v1/goals", {
     method: "POST",
@@ -164,6 +166,12 @@ test("all MVP routes exist and return contract-safe mock payloads", async (t) =>
   });
   assert.equal(preferences.status, 200);
   parseApiResponse("update_notification_preferences", preferences.body);
+
+  const refreshedBootstrap = await client.request("/v1/app/bootstrap", { method: "GET" });
+  assert.equal(refreshedBootstrap.status, 200);
+  parseApiResponse("app_bootstrap", refreshedBootstrap.body);
+  assert.equal(refreshedBootstrap.body.notifications.max_push_per_day, 1);
+  assert.equal(refreshedBootstrap.body.notifications.has_push_token, true);
 
   const reminder = await client.request("/v1/notifications/reminders/send", {
     method: "POST",

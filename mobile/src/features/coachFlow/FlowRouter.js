@@ -9,6 +9,8 @@ import { DashboardScreen } from "./screens/DashboardScreen.js";
 
 export function FlowRouter({
   composer,
+  notificationDirty,
+  notificationDraft,
   snapshot,
   isBusy,
   onActivateGoal,
@@ -16,6 +18,7 @@ export function FlowRouter({
   onCancelComposer,
   onChangeAssessment,
   onChangeGoalTitle,
+  onChangeNotificationField,
   onClarificationChange,
   onCompleteTask,
   onConfirmMilestone,
@@ -24,7 +27,9 @@ export function FlowRouter({
   onRefreshGenerationStatus,
   onRefreshSnapshot,
   onRetryGeneration,
+  onSaveNotifications,
   onSelectGoalPrompt,
+  onSelectNotificationMaxPush,
   onSkipTask,
   onSoftAdjust,
   onSubmitClarifications,
@@ -111,12 +116,18 @@ export function FlowRouter({
       goals={snapshot.goals}
       isBusy={isBusy}
       localDateKey={snapshot.localDateKey}
+      notificationDirty={notificationDirty}
+      notificationDraft={notificationDraft}
+      notifications={snapshot.notifications}
       progress={snapshot.progress}
       today={snapshot.today}
+      onChangeNotificationField={onChangeNotificationField}
       onCompleteTask={onCompleteTask}
       onConfirmMilestone={onConfirmMilestone}
       onCreateAnotherGoal={onCreateAnotherGoal}
       onRefresh={onRefreshSnapshot}
+      onSaveNotifications={onSaveNotifications}
+      onSelectNotificationMaxPush={onSelectNotificationMaxPush}
       onSkipTask={onSkipTask}
       onSoftAdjust={onSoftAdjust}
       onSwitchGoal={onSwitchGoal}
