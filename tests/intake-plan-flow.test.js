@@ -31,10 +31,10 @@ function authHeaders(userId, headers = {}) {
   };
 }
 
-async function postJson(baseUrl, path, payload, userId = null) {
+async function postJson(baseUrl, path, payload, userId = null, headers = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
     method: "POST",
-    headers: authHeaders(userId, { "content-type": "application/json" }),
+    headers: authHeaders(userId, { "content-type": "application/json", ...headers }),
     body: JSON.stringify(payload)
   });
 
@@ -44,10 +44,10 @@ async function postJson(baseUrl, path, payload, userId = null) {
   };
 }
 
-async function patchJson(baseUrl, path, payload, userId = null) {
+async function patchJson(baseUrl, path, payload, userId = null, headers = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
     method: "PATCH",
-    headers: authHeaders(userId, { "content-type": "application/json" }),
+    headers: authHeaders(userId, { "content-type": "application/json", ...headers }),
     body: JSON.stringify(payload)
   });
 
@@ -57,9 +57,9 @@ async function patchJson(baseUrl, path, payload, userId = null) {
   };
 }
 
-async function getJson(baseUrl, path, userId = null) {
+async function getJson(baseUrl, path, userId = null, headers = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
-    headers: authHeaders(userId)
+    headers: authHeaders(userId, headers)
   });
   return {
     status: response.status,
@@ -209,7 +209,7 @@ test("Plan generation reaches delayed before ready for long-running generation",
 
     const create = await postJson(baseUrl, "/v1/goals", {
       user_id: "user-delay",
-      title: "Run 5km [mock-delay] 3 times per week by 2026-12-01"
+      title: "Run 5km 3 times per week by 2026-12-01"
     }, "user-delay");
 
     const goalId = create.body.goal.id;
@@ -220,7 +220,13 @@ test("Plan generation reaches delayed before ready for long-running generation",
       target_date: "2026-12-01"
     }, "user-delay");
 
-    const generate = await postJson(baseUrl, `/v1/goals/${goalId}/plans/generate`, {}, "user-delay");
+    const generate = await postJson(
+      baseUrl,
+      `/v1/goals/${goalId}/plans/generate`,
+      {},
+      "user-delay",
+      { "x-mock-ai-scenario": "delay" }
+    );
     assert.equal(generate.status, 202);
     assert.equal(generate.body.plan_state, "generating");
 
@@ -258,7 +264,7 @@ test("Plan generation surfaces failed state for failed mock AI output", async ()
   await withServer(async ({ baseUrl }) => {
     const create = await postJson(baseUrl, "/v1/goals", {
       user_id: "user-fail",
-      title: "Learn piano [mock-fail] 3 sessions per week by 2026-11-01"
+      title: "Learn piano 3 sessions per week by 2026-11-01"
     }, "user-fail");
 
     const goalId = create.body.goal.id;
@@ -269,7 +275,13 @@ test("Plan generation surfaces failed state for failed mock AI output", async ()
       target_date: "2026-11-01"
     }, "user-fail");
 
-    await postJson(baseUrl, `/v1/goals/${goalId}/plans/generate`, {}, "user-fail");
+    await postJson(
+      baseUrl,
+      `/v1/goals/${goalId}/plans/generate`,
+      {},
+      "user-fail",
+      { "x-mock-ai-scenario": "fail" }
+    );
     await sleep(320);
 
     const failed = await getJson(baseUrl, `/v1/goals/${goalId}/plans/status`, "user-fail");

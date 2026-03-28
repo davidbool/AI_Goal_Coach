@@ -14,7 +14,7 @@ export class PlanService {
     this.delayThresholdMs = 350;
   }
 
-  async triggerGeneration(goalId) {
+  async triggerGeneration(goalId, options = {}) {
     const goal = await this.goalService.getGoal(goalId);
     const assessment = await this.goalService.getAssessment(goalId);
 
@@ -43,7 +43,8 @@ export class PlanService {
       goalText: goal.title,
       clarificationAnswers: clarifications.map((row) => row.answer_text),
       assessment,
-      frameType
+      frameType,
+      mockScenario: options.mockScenario
     });
 
     const now = new this.clock();

@@ -49,6 +49,38 @@ const AMBIGUOUS_PHRASES = [
   "be successful"
 ];
 
+function normalizeScenario(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  if (["ready", "delay", "fail", "invalid_payload", "invalid-payload", "invalid"].includes(normalized)) {
+    return normalized.replaceAll("-", "_");
+  }
+
+  return null;
+}
+
+function resolveLegacyScenario(goalText) {
+  const lowerGoal = goalText.toLowerCase();
+
+  if (lowerGoal.includes("[mock-fail]") || lowerGoal.includes("fail")) {
+    return "fail";
+  }
+
+  if (lowerGoal.includes("[mock-delay]") || lowerGoal.includes("delay")) {
+    return "delay";
+  }
+
+  if (lowerGoal.includes("[mock-invalid]") || lowerGoal.includes("invalid")) {
+    return "invalid_payload";
+  }
+
+  return null;
+}
+
 export class MockAiClient {
   scoreSpecificity(goalText, clarificationAnswers) {
     const aggregate = [goalText, ...clarificationAnswers].join(" ").toLowerCase();
@@ -111,17 +143,17 @@ export class MockAiClient {
     return PlanningFrame.SKILL_MASTERY;
   }
 
-  generatePlanDraft({ goalText, assessment, frameType }) {
-    const lowerGoal = goalText.toLowerCase();
+  generatePlanDraft({ goalText, assessment, frameType, mockScenario = null }) {
     const weeklyMinutes = assessment.weekly_minutes_available;
+    const scenario = normalizeScenario(mockScenario) ?? resolveLegacyScenario(goalText);
 
     let outcome = "ready";
     let resolveMs = 220;
 
-    if (lowerGoal.includes("[mock-fail]") || lowerGoal.includes("fail")) {
+    if (scenario === "fail") {
       outcome = "failed";
       resolveMs = 240;
-    } else if (lowerGoal.includes("[mock-delay]") || lowerGoal.includes("delay")) {
+    } else if (scenario === "delay") {
       outcome = "ready";
       resolveMs = 1200;
     }
@@ -175,6 +207,18 @@ export class MockAiClient {
       payload:
         outcome === "failed"
           ? null
+          : scenario === "invalid_payload"
+            ? {
+                frame_type: frameType,
+                feasibility: minWeeks <= 8 ? "realistic" : "stretched",
+                estimate: {
+                  min_weeks: minWeeks,
+                  max_weeks: maxWeeks,
+                  confidence: 0.68
+                },
+                milestones: [],
+                tasks: []
+              }
           : {
               frame_type: frameType,
               feasibility: minWeeks <= 8 ? "realistic" : "stretched",
