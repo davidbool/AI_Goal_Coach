@@ -130,11 +130,21 @@ export class MockM3Api {
   }
 
   #applyPatch(task, patch) {
-    const allowedKeys = ["title", "estMinutes", "difficulty", "required"];
-    for (const key of allowedKeys) {
-      if (key in patch) {
-        task[key] = patch[key];
+    const normalizedPatch = {
+      title: patch.title,
+      estMinutes: patch.estMinutes ?? patch.est_minutes,
+      difficulty: patch.difficulty,
+      required: patch.required ?? patch.isRequired ?? patch.is_required
+    };
+
+    for (const [key, value] of Object.entries(normalizedPatch)) {
+      if (value !== undefined) {
+        task[key] = value;
       }
+    }
+
+    if (patch.manualLock !== undefined || patch.manual_lock !== undefined) {
+      task.manualLock = Boolean(patch.manualLock ?? patch.manual_lock);
     }
   }
 

@@ -1,11 +1,48 @@
 import { shiftLocalDateKey, toLocalDateKey } from "../../utils/dateTime.js";
 
+function listTasksForPlan(store, planId) {
+  if (typeof store.listTasksForPlan === "function") {
+    return store.listTasksForPlan(planId);
+  }
+
+  if (Array.isArray(store.state?.tasks)) {
+    return store.state.tasks.filter((task) => task.plan_id === planId);
+  }
+
+  return [];
+}
+
+function getTaskCount(store) {
+  if (typeof store.countTasks === "function") {
+    return store.countTasks();
+  }
+
+  if (Array.isArray(store.state?.tasks)) {
+    return store.state.tasks.length;
+  }
+
+  return 0;
+}
+
+function persistAdaptedTask(store, task) {
+  if (typeof store.createAdaptedTask === "function") {
+    return store.createAdaptedTask(task);
+  }
+
+  if (Array.isArray(store.state?.tasks)) {
+    store.state.tasks.push(task);
+    return task;
+  }
+
+  throw new Error("Task persistence is not available on store");
+}
+
 function cloneTasksIntoNewPlan(store, oldPlanId, newPlanId, now, timeZone) {
   const today = toLocalDateKey(now, timeZone);
   const inSevenDays = shiftLocalDateKey(today, 6);
 
-  const sourceTasks = store.state.tasks.filter((task) => task.plan_id === oldPlanId);
-  const nextTaskIndex = store.state.tasks.length + 1;
+  const sourceTasks = listTasksForPlan(store, oldPlanId);
+  const nextTaskIndex = getTaskCount(store) + 1;
   let createdCount = 0;
 
   for (const task of sourceTasks) {
@@ -26,7 +63,7 @@ function cloneTasksIntoNewPlan(store, oldPlanId, newPlanId, now, timeZone) {
       clonedTask.adjustment_source = "full_adaptation";
     }
 
-    store.state.tasks.push(clonedTask);
+    persistAdaptedTask(store, clonedTask);
 
     createdCount += 1;
   }

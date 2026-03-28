@@ -1,5 +1,11 @@
 import { getLocalDateParts, isWithinQuietHours, parseTimeHHMM, toLocalDateKey } from "../../utils/dateTime.js";
 
+function requirePatchObject(patch) {
+  if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
+    throw new Error("patch must be an object");
+  }
+}
+
 function validatePreferencesPatch(patch) {
   if (patch.reminder_time_local !== undefined) {
     parseTimeHHMM(patch.reminder_time_local);
@@ -20,9 +26,56 @@ function validatePreferencesPatch(patch) {
   }
 }
 
+function countIncompleteRequiredTasks(store, goalId, localDateKey) {
+  if (typeof store.countIncompleteRequiredTasks === "function") {
+    return store.countIncompleteRequiredTasks(goalId, localDateKey);
+  }
+
+  if (typeof store.listTasks === "function" && typeof store.getCompletion === "function") {
+    return store
+      .listTasks(goalId)
+      .filter((task) => task.required && task.scheduled_date <= localDateKey)
+      .filter((task) => store.getCompletion(task.id)?.state !== "completed").length;
+  }
+
+  return 0;
+}
+
+function hasPushToken(store, userId) {
+  if (typeof store.hasPushToken === "function") {
+    return store.hasPushToken(userId);
+  }
+
+  if (Array.isArray(store.state?.pushTokens)) {
+    return store.state.pushTokens.some((token) => token.user_id === userId);
+  }
+
+  return false;
+}
+
+function listRemindersForDate(store, userId, localDateKey) {
+  if (typeof store.listRemindersForDate === "function") {
+    return store.listRemindersForDate(userId, localDateKey);
+  }
+
+  if (Array.isArray(store.state?.remindersSent)) {
+    return store.state.remindersSent.filter((reminder) => reminder.user_id === userId && reminder.local_date_key === localDateKey);
+  }
+
+  if (Array.isArray(store.state?.reminders)) {
+    return store.state.reminders.filter((reminder) => reminder.user_id === userId && reminder.local_date_key === localDateKey);
+  }
+
+  return [];
+}
+
 export function registerPushToken(store, userId, token, platform, now = new Date()) {
   if (!token || typeof token !== "string") {
     throw new Error("token is required");
+  }
+
+  if (!store.getUser(userId)) {
+    throw new Error("User not found");
   }
 
   const resolvedPlatform = platform ?? "unknown";
@@ -31,6 +84,11 @@ export function registerPushToken(store, userId, token, platform, now = new Date
 }
 
 export function updateReminderPreferences(store, userId, patch) {
+  if (!store.getUser(userId)) {
+    throw new Error("User not found");
+  }
+
+  requirePatchObject(patch);
   validatePreferencesPatch(patch);
   return store.upsertNotificationPreference(userId, patch);
 }
@@ -56,9 +114,9 @@ export function evaluateReminderEligibility(store, userId, goalId, now = new Dat
 
   const localDateKey = toLocalDateKey(now, user.timezone);
   const localParts = getLocalDateParts(now, user.timezone);
-  const incompleteRequiredTasks = store.countIncompleteRequiredTasks(goalId, localDateKey);
+  const incompleteRequiredTasks = countIncompleteRequiredTasks(store, goalId, localDateKey);
 
-  if (!store.hasPushToken(userId)) {
+  if (!hasPushToken(store, userId)) {
     return {
       eligible: false,
       blocked_reason: "no_push_token",
@@ -85,7 +143,7 @@ export function evaluateReminderEligibility(store, userId, goalId, now = new Dat
     };
   }
 
-  const sentToday = store.listRemindersForDate(userId, localDateKey).length;
+  const sentToday = listRemindersForDate(store, userId, localDateKey).length;
 
   if (sentToday >= preference.max_push_per_day) {
     return {

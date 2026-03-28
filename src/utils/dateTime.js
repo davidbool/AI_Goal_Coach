@@ -1,4 +1,5 @@
 const TIME_FORMATTER_CACHE = new Map();
+const LOCAL_DATE_KEY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 function getFormatter(timeZone) {
   if (!TIME_FORMATTER_CACHE.has(timeZone)) {
@@ -47,6 +48,10 @@ export function toLocalDateKey(date, timeZone) {
 }
 
 export function parseTimeHHMM(value) {
+  if (typeof value !== "string") {
+    throw new Error(`Invalid time format: ${value}`);
+  }
+
   const match = /^(\d{2}):(\d{2})$/.exec(value);
 
   if (!match) {
@@ -64,7 +69,18 @@ export function parseTimeHHMM(value) {
 }
 
 export function shiftLocalDateKey(localDateKey, dayDelta) {
-  const [year, month, day] = localDateKey.split("-").map(Number);
+  if (typeof localDateKey !== "string") {
+    throw new Error(`Invalid local date key: ${localDateKey}`);
+  }
+
+  const match = LOCAL_DATE_KEY_PATTERN.exec(localDateKey);
+  if (!match) {
+    throw new Error(`Invalid local date key: ${localDateKey}`);
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
   const base = new Date(Date.UTC(year, month - 1, day));
   base.setUTCDate(base.getUTCDate() + dayDelta);
 
@@ -88,6 +104,10 @@ export function isWithinQuietHours(localHour, localMinute, quietHoursStart, quie
 }
 
 export function lastNDatesInclusive(localDateKey, count) {
+  if (!Number.isInteger(count) || count < 0) {
+    throw new Error(`Invalid count: ${count}`);
+  }
+
   const dates = [];
 
   for (let i = 0; i < count; i += 1) {

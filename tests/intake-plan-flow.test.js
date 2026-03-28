@@ -157,6 +157,22 @@ test("M1+M2 full happy path supports clarify, onboarding, generation, and activa
     assert.equal(firstGoal.status, "paused");
     assert.equal(secondGoal.status, "active");
 
+    const repatchFirstActive = await patchJson(baseUrl, `/v1/goals/${goalId}/status`, {
+      status: "active"
+    });
+    assert.equal(repatchFirstActive.status, 200);
+    assert.equal(repatchFirstActive.body.goal.status, "active");
+    assert.ok(repatchFirstActive.body.goal.active_at);
+
+    const listedAfterRepatch = await getJson(baseUrl, "/v1/goals?user_id=user-a");
+    assert.equal(listedAfterRepatch.status, 200);
+
+    const firstAfterRepatch = listedAfterRepatch.body.goals.find((goal) => goal.id === goalId);
+    const secondAfterRepatch = listedAfterRepatch.body.goals.find((goal) => goal.id === secondGoalId);
+
+    assert.equal(firstAfterRepatch.status, "active");
+    assert.equal(secondAfterRepatch.status, "paused");
+
     const pauseSecond = await patchJson(baseUrl, `/v1/goals/${secondGoalId}/status`, {
       status: "paused"
     });
@@ -218,4 +234,72 @@ test("Plan generation surfaces failed state for failed mock AI output", async ()
     assert.equal(failed.body.plan_state, "failed");
     assert.equal(failed.body.plan, null);
   });
+});
+
+test("Plan generation falls back to failed when AI returns an invalid payload", async () => {
+  const invalidAiClient = {
+    scoreSpecificity() {
+      return {
+        score: 0.9,
+        missing_elements: []
+      };
+    },
+    classifyFrame() {
+      return "skill_mastery";
+    },
+    generatePlanDraft() {
+      return {
+        outcome: "ready",
+        resolve_ms: 20,
+        payload: {
+          frame_type: "skill_mastery",
+          feasibility: "realistic",
+          estimate: {
+            min_weeks: 4,
+            max_weeks: 8,
+            confidence: 0.7
+          },
+          milestones: [],
+          tasks: []
+        }
+      };
+    }
+  };
+
+  const { app } = createApp({ aiClient: invalidAiClient });
+  const server = app.listen(0);
+
+  await new Promise((resolve) => server.once("listening", resolve));
+
+  const address = server.address();
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const create = await postJson(baseUrl, "/v1/goals", {
+      user_id: "user-invalid",
+      title: "Learn React by building 2 projects by 2026-10-01"
+    });
+
+    const goalId = create.body.goal.id;
+
+    await postJson(baseUrl, `/v1/goals/${goalId}/assessment`, {
+      current_level: "intermediate",
+      weekly_minutes_available: 240,
+      target_date: "2026-10-01"
+    });
+
+    const generate = await postJson(baseUrl, `/v1/goals/${goalId}/plans/generate`, {});
+    assert.equal(generate.status, 202);
+
+    await sleep(60);
+
+    const status = await getJson(baseUrl, `/v1/goals/${goalId}/plans/status`);
+    assert.equal(status.status, 200);
+    assert.equal(status.body.plan_state, "failed");
+    assert.equal(status.body.plan, null);
+  } finally {
+    await new Promise((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+  }
 });

@@ -12,30 +12,149 @@ const FALLBACK_FAILURE_MESSAGES = {
   softAdjust: "Soft adjustment did not sync. Your remaining tasks are unchanged."
 };
 
-function normalizeTask(rawTask) {
+function firstDefined(source, keys) {
+  if (!source || typeof source !== "object") {
+    return undefined;
+  }
+
+  for (const key of keys) {
+    if (source[key] !== undefined && source[key] !== null) {
+      return source[key];
+    }
+  }
+
+  return undefined;
+}
+
+function normalizeBoolean(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1" || normalized === "yes") {
+      return true;
+    }
+    if (normalized === "false" || normalized === "0" || normalized === "no") {
+      return false;
+    }
+  }
+
+  return Boolean(value);
+}
+
+function normalizeMinutes(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
+
+  return Math.round(parsed);
+}
+
+function normalizeTaskState(value) {
+  const normalized = String(value ?? "pending").toLowerCase();
+  if (normalized === "complete" || normalized === "done") {
+    return "completed";
+  }
+
+  if (normalized === "pending" || normalized === "completed" || normalized === "skipped") {
+    return normalized;
+  }
+
+  return "pending";
+}
+
+function normalizePlanVersion(value) {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
+function extractDate(payload) {
+  const dateValue = firstDefined(payload, ["date", "todayDate", "today_date"]);
+  return typeof dateValue === "string" ? dateValue : null;
+}
+
+function extractTasks(payload) {
+  const candidates = [
+    firstDefined(payload, ["tasks"]),
+    firstDefined(payload, ["remainingTasks", "remaining_tasks"]),
+    firstDefined(payload, ["todayTasks", "today_tasks"])
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate;
+    }
+  }
+
+  return [];
+}
+
+function extractPlanVersion(payload) {
+  return normalizePlanVersion(firstDefined(payload, ["planVersion", "plan_version"]));
+}
+
+function extractFeedback(payload, fallbackMessage) {
+  const feedbackValue = firstDefined(payload, ["feedback", "coachMessage", "coach_message", "message"]);
+  if (typeof feedbackValue === "string" && feedbackValue.length > 0) {
+    return feedbackValue;
+  }
+
+  return fallbackMessage;
+}
+
+function normalizeTask(rawTask = {}) {
+  const taskId = firstDefined(rawTask, ["id", "taskId", "task_id"]);
+  const title = firstDefined(rawTask, ["title", "name"]);
+  const estMinutes = firstDefined(rawTask, ["estMinutes", "est_minutes", "estimatedMinutes"]);
+  const difficulty = firstDefined(rawTask, ["difficulty"]) ?? "medium";
+  const required = firstDefined(rawTask, ["required", "isRequired", "is_required"]);
+  const taskState = firstDefined(rawTask, ["state", "status"]);
+  const manualLock = firstDefined(rawTask, ["manualLock", "manual_lock"]);
+  const adjustmentSource = firstDefined(rawTask, ["adjustmentSource", "adjustment_source"]) ?? "plan";
+  const syncState = firstDefined(rawTask, ["syncState", "sync_state"]) ?? "synced";
+
   return {
-    id: String(rawTask.id),
-    title: rawTask.title,
-    estMinutes: Number(rawTask.estMinutes ?? rawTask.est_minutes ?? 0),
-    difficulty: rawTask.difficulty ?? "medium",
-    required: Boolean(rawTask.required),
-    state: rawTask.state ?? "pending",
-    manualLock: Boolean(rawTask.manualLock ?? rawTask.manual_lock),
-    adjustmentSource: rawTask.adjustmentSource ?? rawTask.adjustment_source ?? "plan",
-    syncState: rawTask.syncState ?? "synced"
+    id: String(taskId ?? ""),
+    title: String(title ?? "Untitled task"),
+    estMinutes: normalizeMinutes(estMinutes),
+    difficulty,
+    required: normalizeBoolean(required),
+    state: normalizeTaskState(taskState),
+    manualLock: normalizeBoolean(manualLock),
+    adjustmentSource,
+    syncState
   };
 }
 
 function extractTaskFromMutation(payload) {
-  if (!payload) {
+  if (!payload || typeof payload !== "object") {
     return null;
   }
 
-  if (payload.task && typeof payload.task === "object") {
-    return payload.task;
+  const taskPayload = firstDefined(payload, ["task", "updatedTask", "updated_task"]);
+  if (taskPayload && typeof taskPayload === "object") {
+    return taskPayload;
   }
 
-  if (payload.id) {
+  if (payload.data && typeof payload.data === "object") {
+    const nestedTask = firstDefined(payload.data, ["task", "updatedTask", "updated_task"]);
+    if (nestedTask && typeof nestedTask === "object") {
+      return nestedTask;
+    }
+  }
+
+  if (firstDefined(payload, ["id", "task_id"])) {
     return payload;
   }
 
@@ -85,13 +204,13 @@ export class DailyExecutionLoop {
 
     try {
       const payload = await this.api.fetchTodayTasks();
-      const incomingTasks = Array.isArray(payload.tasks) ? payload.tasks : [];
+      const incomingTasks = extractTasks(payload);
 
-      this.state.date = payload.date ?? null;
+      this.state.date = extractDate(payload);
       this.state.tasks = incomingTasks.map(normalizeTask);
-      this.state.planVersion = Number.isInteger(payload.planVersion) ? payload.planVersion : null;
+      this.state.planVersion = extractPlanVersion(payload);
       this.state.lastSyncedAt = this.now().toISOString();
-      this.#pushFeedback(payload.feedback ?? "Your plan is ready. Small steps are enough.");
+      this.#pushFeedback(extractFeedback(payload, "Your plan is ready. Small steps are enough."));
       return this.getState();
     } finally {
       this.state.loading = false;
@@ -137,14 +256,20 @@ export class DailyExecutionLoop {
 
     try {
       const payload = await this.api.softAdjust();
-      this.#assertPlanVersionStable(payload.planVersion);
+      const nextPlanVersion = extractPlanVersion(payload);
+      this.#assertPlanVersionStable(nextPlanVersion);
+      if (nextPlanVersion !== null) {
+        this.state.planVersion = nextPlanVersion;
+      }
 
-      const adjustedTasks = Array.isArray(payload.tasks) ? payload.tasks.map(normalizeTask) : [];
+      const adjustedTasks = extractTasks(payload).map(normalizeTask);
       const completedOrSkipped = previousTasks.filter((task) => task.state !== "pending");
+      const adjustedTaskIds = new Set(adjustedTasks.map((task) => task.id));
+      const untouchedDoneTasks = completedOrSkipped.filter((task) => !adjustedTaskIds.has(task.id));
 
-      this.state.tasks = [...completedOrSkipped, ...adjustedTasks];
+      this.state.tasks = [...untouchedDoneTasks, ...adjustedTasks];
       this.state.lastSyncedAt = this.now().toISOString();
-      this.#pushFeedback(payload.feedback ?? FALLBACK_SUCCESS_MESSAGES.softAdjust);
+      this.#pushFeedback(extractFeedback(payload, FALLBACK_SUCCESS_MESSAGES.softAdjust));
 
       return this.getState();
     } catch (error) {
@@ -158,7 +283,8 @@ export class DailyExecutionLoop {
   }
 
   async #mutateTask({ taskId, mutationType, optimisticTaskPatch, apiCall }) {
-    const taskIndex = this.state.tasks.findIndex((task) => task.id === taskId);
+    const normalizedTaskId = String(taskId);
+    const taskIndex = this.state.tasks.findIndex((task) => task.id === normalizedTaskId);
     if (taskIndex === -1) {
       throw new Error(`Task ${taskId} not found in daily loop.`);
     }
@@ -184,7 +310,7 @@ export class DailyExecutionLoop {
       };
 
       this.state.lastSyncedAt = this.now().toISOString();
-      this.#pushFeedback(FALLBACK_SUCCESS_MESSAGES[mutationType]);
+      this.#pushFeedback(extractFeedback(payload, FALLBACK_SUCCESS_MESSAGES[mutationType]));
       this.#emit();
 
       return this.getState();

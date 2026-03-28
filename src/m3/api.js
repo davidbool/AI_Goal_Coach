@@ -12,8 +12,17 @@ async function readErrorMessage(response) {
     if (payload && typeof payload.error === "string") {
       return payload.error;
     }
+    if (payload && payload.error && typeof payload.error.message === "string") {
+      return payload.error.message;
+    }
     if (payload && typeof payload.message === "string") {
       return payload.message;
+    }
+    if (payload && Array.isArray(payload.errors) && payload.errors.length > 0) {
+      const firstError = payload.errors[0];
+      if (firstError && typeof firstError.message === "string") {
+        return firstError.message;
+      }
     }
   } catch {
     // No JSON payload returned by server.
@@ -81,10 +90,15 @@ export class M3ApiClient {
   }
 
   async #request(path, init) {
+    const isFormDataBody = typeof FormData !== "undefined" && init?.body instanceof FormData;
+    const hasJsonBody = Boolean(init?.body) && !isFormDataBody;
+    const headers = {
+      Accept: "application/json",
+      ...(hasJsonBody ? { "Content-Type": "application/json" } : {})
+    };
+
     const response = await this.fetchImpl(joinPath(this.baseUrl, path), {
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers,
       ...init
     });
 

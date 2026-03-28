@@ -107,6 +107,16 @@ export const PlanDisplaySchema = z
   })
   .strict();
 
+export const GeneratedPlanPayloadSchema = z
+  .object({
+    frame_type: PlanningFrameSchema,
+    feasibility: FeasibilitySchema,
+    estimate: PlanEstimateSchema,
+    milestones: z.array(PlanMilestoneSchema).min(1),
+    tasks: z.array(PlanTaskSchema).min(1)
+  })
+  .strict();
+
 export const TaskSchema = z
   .object({
     id: z.string(),

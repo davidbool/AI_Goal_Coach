@@ -238,6 +238,88 @@ test("soft adjustment rejects plan version bumps", async () => {
   assert.equal(loop.getState().tasks[0].title, "Task A");
 });
 
+test("daily loop accepts snake_case and envelope-style payloads", async () => {
+  const api = {
+    async fetchTodayTasks() {
+      return {
+        date: "2026-03-26",
+        plan_version: 9,
+        tasks: [
+          {
+            task_id: "t-snake",
+            title: "Walk ten minutes",
+            est_minutes: 10,
+            difficulty: "low",
+            required: 1,
+            status: "pending",
+            manual_lock: 0,
+            adjustment_source: "plan"
+          }
+        ],
+        coach_message: "Day starts simple."
+      };
+    },
+    async completeTask() {
+      return {
+        data: {
+          updated_task: {
+            task_id: "t-snake",
+            title: "Walk ten minutes",
+            est_minutes: "10",
+            difficulty: "low",
+            required: true,
+            status: "done",
+            manual_lock: 1,
+            adjustment_source: "plan"
+          }
+        },
+        coach_message: "Great consistency."
+      };
+    },
+    async skipTask() {
+      throw new Error("not used");
+    },
+    async editTask() {
+      throw new Error("not used");
+    },
+    async softAdjust() {
+      return {
+        plan_version: "9",
+        remaining_tasks: [
+          {
+            task_id: "t-snake",
+            title: "Walk ten minutes",
+            est_minutes: 8,
+            difficulty: "low",
+            required: true,
+            status: "pending",
+            manual_lock: true,
+            adjustment_source: "same_day_soft"
+          }
+        ],
+        coach_message: "We lightened the remaining load."
+      };
+    }
+  };
+
+  const loop = new DailyExecutionLoop({ api });
+  await loop.loadToday();
+  assert.equal(loop.getState().planVersion, 9);
+  assert.equal(loop.getState().tasks[0].id, "t-snake");
+  assert.equal(loop.getState().tasks[0].required, true);
+
+  await loop.completeTask("t-snake");
+  assert.equal(loop.getState().tasks[0].state, "completed");
+  assert.equal(loop.getState().tasks[0].manualLock, true);
+  assert.match(loop.getState().feedback.at(-1), /Great consistency/);
+
+  await loop.softAdjust();
+  assert.equal(loop.getState().planVersion, 9);
+  assert.equal(loop.getState().tasks[0].estMinutes, 8);
+  assert.equal(loop.getState().tasks[0].adjustmentSource, "same_day_soft");
+  assert.match(loop.getState().feedback.at(-1), /lightened/);
+});
+
 test("daily loop can complete in under ten seconds", async () => {
   const api = createMockM3Api({ latencyMs: 0 });
   const loop = new DailyExecutionLoop({ api });

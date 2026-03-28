@@ -4,12 +4,18 @@ function sortDateKeys(dateKeys) {
   return [...dateKeys].sort((a, b) => a.localeCompare(b));
 }
 
+function uniqueDateKeys(dateKeys) {
+  return [...new Set(dateKeys.filter(Boolean))];
+}
+
 function calculateLongestStreak(dateKeys) {
-  if (dateKeys.length === 0) {
+  const uniqueKeys = uniqueDateKeys(dateKeys);
+
+  if (uniqueKeys.length === 0) {
     return 0;
   }
 
-  const sorted = sortDateKeys(dateKeys);
+  const sorted = sortDateKeys(uniqueKeys);
   let longest = 1;
   let current = 1;
 
@@ -67,16 +73,26 @@ function collectCompletionDateKeys(store, goalId, timeZone) {
     .listCompletionsForGoal(goalId)
     .filter((completion) => completion.state === "completed");
 
-  return completions.map((completion) => toLocalDateKey(new Date(completion.completed_at), timeZone));
+  return completions
+    .map((completion) => {
+      const completedAt = new Date(completion.completed_at);
+
+      if (Number.isNaN(completedAt.getTime())) {
+        return null;
+      }
+
+      return toLocalDateKey(completedAt, timeZone);
+    })
+    .filter(Boolean);
 }
 
 export function recalculateStreak(store, goalId, now, timeZone) {
   const todayKey = toLocalDateKey(now, timeZone);
-  const completionDateKeys = collectCompletionDateKeys(store, goalId, timeZone);
+  const completionDateKeys = uniqueDateKeys(collectCompletionDateKeys(store, goalId, timeZone));
   const completionSet = new Set(completionDateKeys);
 
   const { currentDays, lastSuccessDate } = calculateCurrentStreak(completionSet, todayKey);
-  const longestDays = calculateLongestStreak(sortDateKeys(completionDateKeys));
+  const longestDays = calculateLongestStreak(completionDateKeys);
 
   const streak = store.upsertStreak(goalId, {
     current_days: currentDays,
@@ -85,6 +101,22 @@ export function recalculateStreak(store, goalId, now, timeZone) {
   });
 
   return streak;
+}
+
+function resolveGoalTimezone(store, goal) {
+  if (goal?.user_id && typeof store.getUser === "function") {
+    const goalOwner = store.getUser(goal.user_id);
+
+    if (goalOwner?.timezone) {
+      return goalOwner.timezone;
+    }
+  }
+
+  if (store.state?.user?.timezone) {
+    return store.state.user.timezone;
+  }
+
+  return "UTC";
 }
 
 export function markTaskCompletedAndRefreshStreak(store, taskId, now = new Date()) {
@@ -101,7 +133,7 @@ export function markTaskCompletedAndRefreshStreak(store, taskId, now = new Date(
     throw new Error("Goal not found for task");
   }
 
-  recalculateStreak(store, goal.id, now, store.state.user.timezone);
+  recalculateStreak(store, goal.id, now, resolveGoalTimezone(store, goal));
 
   return completion;
 }

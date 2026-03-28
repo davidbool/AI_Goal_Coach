@@ -30,3 +30,4 @@ console.log(today.render());
 - `editTask` marks tasks as `manualLock = true`.
 - `softAdjust` updates only remaining pending tasks.
 - `softAdjust` rejects any response that bumps `planVersion`.
+- Payload parsing accepts both camelCase and snake_case contract fields.
