@@ -11,9 +11,10 @@ import { registerPushToken, sendReminderIfEligible, updateReminderPreferences } 
 import { createConfiguredStore } from "./repositories/storeFactory.js";
 import { createObservability } from "./observability/observability.js";
 import { createAuthMiddleware } from "./server/auth.js";
+import { createConfiguredAiClient } from "./services/aiClientFactory.js";
+import { bootstrapDevSession, resetDevSession } from "./services/devSessionService.js";
 import { GoalService } from "./services/goalService.js";
 import { GoalSpecificityService } from "./services/goalSpecificityService.js";
-import { MockAiClient } from "./services/mockAiClient.js";
 import { PlanService } from "./services/planService.js";
 import { toLocalDateKey } from "./utils/dateTime.js";
 
@@ -160,6 +161,17 @@ function getObservedRoute(req) {
   return req.route?.path ?? req.path;
 }
 
+function getMockAiScenario(req) {
+  const scenario = req.get("x-mock-ai-scenario");
+
+  if (typeof scenario !== "string") {
+    return null;
+  }
+
+  const normalized = scenario.trim().toLowerCase();
+  return normalized.length > 0 ? normalized : null;
+}
+
 export function createApp(overrides = {}) {
   const defaultUserId = overrides.defaultUserId ?? "demo-user";
   const authMode = overrides.authMode ?? process.env.GOAL_COACH_AUTH_MODE ?? "dev";
@@ -172,7 +184,11 @@ export function createApp(overrides = {}) {
       defaultUser: overrides.defaultUser,
       prisma: overrides.prisma
     });
-  const aiClient = overrides.aiClient ?? new MockAiClient();
+  const aiClient =
+    overrides.aiClient ??
+    createConfiguredAiClient({
+      aiProvider: overrides.aiProvider
+    });
   const clock = overrides.clock ?? Date;
   const nowProvider = overrides.nowProvider ?? (() => new clock());
   const observability =
@@ -226,6 +242,33 @@ export function createApp(overrides = {}) {
 
   app.get("/v1/ops/metrics", route(async (_req, res) => {
     res.status(200).json(observability.snapshot(nowProvider()));
+  }));
+
+  app.post("/v1/dev/bootstrap", route(async (req, res) => {
+    const { body } = parseApiRequest("dev_bootstrap", {
+      params: {},
+      body: req.body ?? {}
+    });
+    const userId = getAuthenticatedUserId(req);
+    const session = await bootstrapDevSession(
+      store,
+      userId,
+      body.scenario,
+      nowProvider()
+    );
+
+    respond(res, "dev_bootstrap", 200, session);
+  }));
+
+  app.post("/v1/dev/reset", route(async (req, res) => {
+    parseApiRequest("dev_reset", {
+      params: {},
+      body: req.body ?? {}
+    });
+    const userId = getAuthenticatedUserId(req);
+    const session = await resetDevSession(store, userId, nowProvider());
+
+    respond(res, "dev_reset", 200, session);
   }));
 
   app.post("/v1/goals", route(async (req, res) => {
@@ -309,7 +352,10 @@ export function createApp(overrides = {}) {
       const userId = getAuthenticatedUserId(req);
       await findGoalForUser(store, params.goalId, userId);
 
-      const result = await planService.triggerGeneration(params.goalId, body.force);
+      const result = await planService.triggerGeneration(params.goalId, {
+        force: body.force,
+        mockScenario: getMockAiScenario(req)
+      });
       respond(res, "generate_plan", 202, result);
   }));
 

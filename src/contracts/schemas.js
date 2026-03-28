@@ -49,6 +49,16 @@ export const GoalSchema = z
   })
   .strict();
 
+export const UserSchema = z
+  .object({
+    id: z.string(),
+    timezone: z.string(),
+    locale: z.string(),
+    created_at: IsoDateTimeSchema.optional(),
+    updated_at: IsoDateTimeSchema.optional()
+  })
+  .strict();
+
 export const ClarificationSchema = z
   .object({
     id: z.string(),
@@ -228,6 +238,30 @@ export const SpecificityEvaluationSchema = z
   })
   .strict();
 
+export const DevDemoScenarioSchema = z.enum([
+  "starter",
+  "active_goal_ready",
+  "no_active_goal",
+  "no_tasks_today"
+]);
+
+export const DevSessionSchema = z
+  .object({
+    user: UserSchema,
+    scenario: DevDemoScenarioSchema,
+    available_scenarios: z.array(DevDemoScenarioSchema),
+    available_mock_generation_scenarios: z.array(z.enum(["ready", "delay", "fail", "invalid_payload"])),
+    local_date_key: IsoDateSchema,
+    summary: z
+      .object({
+        goal_count: z.number().int().min(0),
+        active_goal_id: z.string().nullable(),
+        today_task_count: z.number().int().min(0)
+      })
+      .strict()
+  })
+  .strict();
+
 const EmptySchema = z.object({}).strict();
 
 export const ApiContracts = {
@@ -258,6 +292,24 @@ export const ApiContracts = {
         goals: z.array(GoalSchema)
       })
       .strict()
+  },
+  dev_bootstrap: {
+    method: "POST",
+    path: "/v1/dev/bootstrap",
+    params: EmptySchema,
+    body: z
+      .object({
+        scenario: DevDemoScenarioSchema.optional()
+      })
+      .strict(),
+    response: DevSessionSchema
+  },
+  dev_reset: {
+    method: "POST",
+    path: "/v1/dev/reset",
+    params: EmptySchema,
+    body: EmptySchema,
+    response: DevSessionSchema
   },
   activate_goal: {
     method: "POST",

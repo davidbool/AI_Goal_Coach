@@ -73,6 +73,21 @@ function getPlanEstimate(plan) {
   };
 }
 
+function retainEntries(array, predicate) {
+  let writeIndex = 0;
+
+  for (let readIndex = 0; readIndex < array.length; readIndex += 1) {
+    const entry = array[readIndex];
+
+    if (predicate(entry)) {
+      array[writeIndex] = entry;
+      writeIndex += 1;
+    }
+  }
+
+  array.length = writeIndex;
+}
+
 function createUserRecord(userId, overrides = {}) {
   return {
     id: userId,
@@ -349,6 +364,265 @@ export function createInMemoryStore(options = {}) {
     const created = createUserRecord(userId, overrides);
     store.users.set(userId, created);
     return created;
+  }
+
+  function buildDemoId(userId, suffix) {
+    const normalizedUserId = String(userId)
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "guest";
+
+    return `demo-${normalizedUserId}-${suffix}`;
+  }
+
+  function removeGoalGraph(goalId) {
+    const goal = getGoal(goalId);
+
+    if (!goal) {
+      return;
+    }
+
+    const planIds = (store.plansByGoal.get(goalId) ?? []).map((plan) => plan.id);
+
+    for (const planId of planIds) {
+      const taskIds = (store.tasksByPlan.get(planId) ?? []).slice();
+
+      for (const taskId of taskIds) {
+        const task = store.tasks.get(taskId);
+
+        if (!task) {
+          continue;
+        }
+
+        store.tasks.delete(taskId);
+        removeFromIndex(store.tasksByGoal, task.goal_id, taskId);
+        removeFromIndex(store.tasksByPlan, task.plan_id, taskId);
+        store.completionsByTask.delete(taskId);
+      }
+
+      store.tasksByPlan.delete(planId);
+
+      const milestoneIds = (store.milestonesByPlan.get(planId) ?? []).slice();
+
+      for (const milestoneId of milestoneIds) {
+        store.milestones.delete(milestoneId);
+      }
+
+      store.milestonesByPlan.delete(planId);
+      store.plansById.delete(planId);
+    }
+
+    store.plansByGoal.delete(goalId);
+    store.tasksByGoal.delete(goalId);
+    store.streaksByGoal.delete(goalId);
+    store.planJobsByGoal.delete(goalId);
+    store.assessmentByGoal.delete(goalId);
+    store.clarificationsByGoal.delete(goalId);
+    store.goals.delete(goalId);
+    removeFromIndex(store.goalsByUser, goal.user_id, goalId);
+    retainEntries(store.remindersSent, (entry) => entry.goal_id !== goalId);
+    retainEntries(store.adaptJobs, (entry) => entry.goal_id !== goalId);
+  }
+
+  function resetUserState(userId) {
+    ensureUser(userId);
+
+    const goals = getGoalsForUser(api, userId).map((goal) => goal.id);
+
+    for (const goalId of goals) {
+      removeGoalGraph(goalId);
+    }
+
+    store.notificationPreferencesByUser.delete(userId);
+    store.pushTokensByUser.delete(userId);
+    retainEntries(store.remindersSent, (entry) => entry.user_id !== userId);
+    retainEntries(store.adaptJobs, (entry) => entry.user_id !== userId);
+
+    return getUser(userId);
+  }
+
+  function seedDemoState(userId, scenario, now = new Date()) {
+    const user = ensureUser(userId);
+    const nowIsoValue = now.toISOString();
+    const todayKey = toLocalDateKey(now, user.timezone);
+    const yesterdayKey = shiftLocalDateKey(todayKey, -1);
+    const tomorrowKey = shiftLocalDateKey(todayKey, 1);
+
+    if (scenario === "starter") {
+      return {
+        user,
+        scenario
+      };
+    }
+
+    const goalId = buildDemoId(userId, "goal");
+    const planId = buildDemoId(userId, "plan-v1");
+    const status = scenario === "no_active_goal" ? "paused" : "active";
+    const goal = {
+      id: goalId,
+      user_id: userId,
+      title: "Build my AI Goal Coach UI",
+      status,
+      specificity_state: "specific",
+      specificity_score: 0.93,
+      plan_state: "ready",
+      active_at: status === "active" ? nowIsoValue : null,
+      active_plan_id: planId,
+      created_at: nowIsoValue,
+      updated_at: nowIsoValue
+    };
+
+    createGoalRecord(goal);
+
+    upsertAssessment(goal.id, {
+      id: buildDemoId(userId, "assessment"),
+      goal_id: goal.id,
+      current_level: "builder",
+      weekly_minutes_available: 240,
+      target_date: shiftLocalDateKey(todayKey, 60),
+      created_at: nowIsoValue
+    });
+
+    const milestones = [
+      {
+        id: buildDemoId(userId, "milestone-1"),
+        plan_id: planId,
+        title: "Guest auth shell live",
+        target_week: 1,
+        success_criteria: "Guest session persists and opens the app",
+        status: "confirmed",
+        user_confirmed_at: nowIsoValue
+      },
+      {
+        id: buildDemoId(userId, "milestone-2"),
+        plan_id: planId,
+        title: "Daily loop preview screen",
+        target_week: 2,
+        success_criteria: "Today screen loads and handles empty states",
+        status: "pending",
+        user_confirmed_at: null
+      }
+    ];
+
+    const taskDateKeys =
+      scenario === "no_tasks_today"
+        ? [tomorrowKey, shiftLocalDateKey(tomorrowKey, 1)]
+        : [todayKey, todayKey];
+
+    const tasks = [
+      {
+        id: buildDemoId(userId, "task-1"),
+        plan_id: planId,
+        goal_id: goal.id,
+        scheduled_date: taskDateKeys[0],
+        title: "Ship the guest session screen",
+        est_minutes: 25,
+        difficulty: "low",
+        required: true,
+        dimension_tag: "auth",
+        source: "plan",
+        manual_lock: false,
+        adjustment_source: "plan"
+      },
+      {
+        id: buildDemoId(userId, "task-2"),
+        plan_id: planId,
+        goal_id: goal.id,
+        scheduled_date: taskDateKeys[1],
+        title: "Hook demo scenarios into the UI shell",
+        est_minutes: 35,
+        difficulty: "medium",
+        required: true,
+        dimension_tag: "ui",
+        source: "plan",
+        manual_lock: false,
+        adjustment_source: "plan"
+      },
+      {
+        id: buildDemoId(userId, "task-3"),
+        plan_id: planId,
+        goal_id: goal.id,
+        scheduled_date: yesterdayKey,
+        title: "Lock down API contracts for onboarding",
+        est_minutes: 30,
+        difficulty: "medium",
+        required: true,
+        dimension_tag: "contracts",
+        source: "plan",
+        manual_lock: false,
+        adjustment_source: "plan"
+      }
+    ];
+
+    const plan = {
+      id: planId,
+      goal_id: goal.id,
+      version: 1,
+      frame_type: "project_outcome",
+      feasibility: "realistic",
+      estimate: {
+        min_weeks: 4,
+        max_weeks: 6,
+        confidence: 0.81
+      },
+      estimate_min_weeks: 4,
+      estimate_max_weeks: 6,
+      confidence: 0.81,
+      milestones: milestones.map((milestone) => ({
+        title: milestone.title,
+        target_week: milestone.target_week,
+        success_criteria: milestone.success_criteria
+      })),
+      tasks: tasks.map((task) => ({
+        title: task.title,
+        est_minutes: task.est_minutes,
+        difficulty: task.difficulty,
+        required: task.required
+      })),
+      created_at: nowIsoValue
+    };
+
+    persistPlanRecord(store, plan);
+
+    for (const milestone of milestones) {
+      persistMilestoneRecord(store, milestone);
+    }
+
+    for (const task of tasks) {
+      persistTaskRecord(store, task);
+    }
+
+    store.completionsByTask.set(buildDemoId(userId, "task-3"), {
+      id: buildDemoId(userId, "completion-1"),
+      task_id: buildDemoId(userId, "task-3"),
+      state: "completed",
+      actual_minutes: 28,
+      completed_at: nowIsoValue
+    });
+
+    store.streaksByGoal.set(goal.id, {
+      id: buildDemoId(userId, "streak"),
+      goal_id: goal.id,
+      current_days: scenario === "no_tasks_today" ? 1 : 2,
+      longest_days: 3,
+      last_success_date: yesterdayKey
+    });
+
+    store.notificationPreferencesByUser.set(userId, {
+      id: buildDemoId(userId, "notif-pref"),
+      user_id: userId,
+      reminder_time_local: "20:00",
+      quiet_hours_start: "22:00",
+      quiet_hours_end: "07:00",
+      max_push_per_day: 2
+    });
+
+    return {
+      user,
+      goal,
+      scenario
+    };
   }
 
   function getUser(userId) {
@@ -886,6 +1160,8 @@ export function createInMemoryStore(options = {}) {
     createReminder,
     markTaskCompleted,
     countIncompleteRequiredTasks,
+    resetUserState,
+    seedDemoState,
     getStateSnapshot,
     disconnect: async () => {}
   };
