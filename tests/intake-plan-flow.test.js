@@ -157,6 +157,13 @@ test("M1+M2 full happy path supports clarify, onboarding, generation, and activa
       target_date: "2026-10-01"
     }, "user-a");
 
+    const activateSecondBeforePlan = await postJson(baseUrl, `/v1/goals/${secondGoalId}/activate`, {}, "user-a");
+    assert.equal(activateSecondBeforePlan.status, 409);
+
+    await postJson(baseUrl, `/v1/goals/${secondGoalId}/plans/generate`, {}, "user-a");
+    const secondReady = await pollReadyStatus(baseUrl, secondGoalId, "user-a");
+    assert.equal(secondReady.plan_state, "ready");
+
     const activateSecond = await postJson(baseUrl, `/v1/goals/${secondGoalId}/activate`, {}, "user-a");
     assert.equal(activateSecond.status, 200);
     assert.equal(activateSecond.body.goal.status, "active");

@@ -319,7 +319,12 @@ export function getTaskMinutes(task) {
 }
 
 export function isGoalActivatable(goal) {
-  return goal?.specificity_state === "specific" && goal?.status !== "active" && goal?.status !== "archived";
+  return (
+    goal?.specificity_state === "specific" &&
+    goal?.plan_state === "ready" &&
+    goal?.status !== "active" &&
+    goal?.status !== "archived"
+  );
 }
 
 export function createGoalSummary(goal) {

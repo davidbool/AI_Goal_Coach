@@ -5,6 +5,24 @@ import { ApiContracts, parseApiResponse } from "../src/contracts/schemas.js";
 import { createServer } from "../src/server/createServer.js";
 import { startServer } from "./helpers/httpTestClient.js";
 
+async function waitForReadyPlan(client, goalId, attempts = 20) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const status = await client.request(`/v1/goals/${goalId}/plans/status`, { method: "GET" });
+
+    if (status.body.plan_state === "ready") {
+      return status;
+    }
+
+    if (status.body.plan_state === "failed") {
+      return status;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  }
+
+  throw new Error(`Timed out waiting for ready plan for ${goalId}`);
+}
+
 test("all MVP routes exist and return contract-safe mock payloads", async (t) => {
   const now = new Date("2026-03-26T12:00:00.000Z");
   const { server } = createServer({ nowProvider: () => now });
@@ -37,16 +55,19 @@ test("all MVP routes exist and return contract-safe mock payloads", async (t) =>
   parseApiResponse("create_goal", createGoal.body);
   const createdGoalId = createGoal.body.goal.id;
 
-  const activate = await client.request(`/v1/goals/${createdGoalId}/activate`, { method: "POST", body: {} });
-  assert.equal(activate.status, 200);
-  parseApiResponse("activate_goal", activate.body);
+  const activateBeforePlan = await client.request(`/v1/goals/${createdGoalId}/activate`, {
+    method: "POST",
+    body: {}
+  });
+  assert.equal(activateBeforePlan.status, 409);
+  assert.match(activateBeforePlan.body.error.message, /ready plan/i);
 
   const patchStatus = await client.request(`/v1/goals/${createdGoalId}/status`, {
     method: "PATCH",
     body: { status: "active" }
   });
-  assert.equal(patchStatus.status, 200);
-  parseApiResponse("patch_goal_status", patchStatus.body);
+  assert.equal(patchStatus.status, 409);
+  assert.match(patchStatus.body.error.message, /ready plan/i);
 
   const clarifications = await client.request(`/v1/goals/${createdGoalId}/clarifications`, {
     method: "POST",
@@ -80,9 +101,20 @@ test("all MVP routes exist and return contract-safe mock payloads", async (t) =>
   assert.equal(generate.status, 202);
   parseApiResponse("generate_plan", generate.body);
 
-  const status = await client.request(`/v1/goals/${createdGoalId}/plans/status`, { method: "GET" });
+  const status = await waitForReadyPlan(client, createdGoalId);
   assert.equal(status.status, 200);
   parseApiResponse("plan_status", status.body);
+
+  const activate = await client.request(`/v1/goals/${createdGoalId}/activate`, { method: "POST", body: {} });
+  assert.equal(activate.status, 200);
+  parseApiResponse("activate_goal", activate.body);
+
+  const patchStatusReady = await client.request(`/v1/goals/${createdGoalId}/status`, {
+    method: "PATCH",
+    body: { status: "active" }
+  });
+  assert.equal(patchStatusReady.status, 200);
+  parseApiResponse("patch_goal_status", patchStatusReady.body);
 
   const activateSeedGoal = await client.request("/v1/goals/goal-1/activate", {
     method: "POST",
