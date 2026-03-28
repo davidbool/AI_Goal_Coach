@@ -78,6 +78,10 @@ export function fetchGoals(baseUrl, userId) {
   return request(baseUrl, userId, "/v1/goals");
 }
 
+export function fetchAppBootstrap(baseUrl, userId) {
+  return request(baseUrl, userId, "/v1/app/bootstrap");
+}
+
 export function fetchTodayTasks(baseUrl, userId) {
   return request(baseUrl, userId, "/v1/goals/active/tasks/today");
 }
@@ -90,6 +94,27 @@ export function createGoal(baseUrl, userId, title) {
   return request(baseUrl, userId, "/v1/goals", {
     method: "POST",
     body: { title }
+  });
+}
+
+export function activateGoal(baseUrl, userId, goalId) {
+  return request(baseUrl, userId, `/v1/goals/${goalId}/activate`, {
+    method: "POST",
+    body: {}
+  });
+}
+
+export function updateGoalStatus(baseUrl, userId, goalId, status) {
+  return request(baseUrl, userId, `/v1/goals/${goalId}/status`, {
+    method: "PATCH",
+    body: { status }
+  });
+}
+
+export function submitClarifications(baseUrl, userId, goalId, answers) {
+  return request(baseUrl, userId, `/v1/goals/${goalId}/clarifications`, {
+    method: "POST",
+    body: { answers }
   });
 }
 
@@ -113,4 +138,60 @@ export function generatePlan(baseUrl, userId, goalId, mockScenario = "ready") {
 
 export function fetchPlanStatus(baseUrl, userId, goalId) {
   return request(baseUrl, userId, `/v1/goals/${goalId}/plans/status`);
+}
+
+export function completeTask(baseUrl, userId, taskId, payload = {}) {
+  return request(baseUrl, userId, `/v1/tasks/${taskId}/complete`, {
+    method: "POST",
+    body: payload
+  });
+}
+
+export function skipTask(baseUrl, userId, taskId, payload = {}) {
+  return request(baseUrl, userId, `/v1/tasks/${taskId}/skip`, {
+    method: "POST",
+    body: payload
+  });
+}
+
+export function editTask(baseUrl, userId, taskId, payload) {
+  return request(baseUrl, userId, `/v1/tasks/${taskId}`, {
+    method: "PATCH",
+    body: payload
+  });
+}
+
+export function softAdjustActiveGoal(baseUrl, userId) {
+  return request(baseUrl, userId, "/v1/goals/active/soft-adjust", {
+    method: "POST",
+    body: {}
+  });
+}
+
+export function triggerFullAdaptation(baseUrl, userId, payload = {}) {
+  return request(baseUrl, userId, "/v1/goals/active/adapt", {
+    method: "POST",
+    body: payload
+  });
+}
+
+export function confirmMilestone(baseUrl, userId, milestoneId) {
+  return request(baseUrl, userId, `/v1/milestones/${milestoneId}/confirm`, {
+    method: "POST",
+    body: {}
+  });
+}
+
+export function registerNotificationToken(baseUrl, userId, token, platform = "ios") {
+  return request(baseUrl, userId, "/v1/notifications/token", {
+    method: "POST",
+    body: { token, platform }
+  });
+}
+
+export function updateNotificationPreferences(baseUrl, userId, payload) {
+  return request(baseUrl, userId, "/v1/notifications/preferences", {
+    method: "PATCH",
+    body: payload
+  });
 }

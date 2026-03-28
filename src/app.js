@@ -105,6 +105,56 @@ function mapTask(task, completion = null) {
   };
 }
 
+async function buildTodayTasksPayload(store, user, activeGoal, now) {
+  const localDateKey = toLocalDateKey(now, user.timezone);
+  const plan = await store.getActivePlan(activeGoal.id);
+  const taskRecords = await store.listTasksForLocalDate(activeGoal.id, localDateKey);
+  const tasks = await Promise.all(
+    taskRecords.map(async (task) => mapTask(task, await store.getCompletion(task.id)))
+  );
+
+  return {
+    date: localDateKey,
+    goal_id: activeGoal.id,
+    planVersion: plan?.version ?? 1,
+    feedback: "You are set for today. Small steps are enough.",
+    tasks
+  };
+}
+
+async function buildAppBootstrapPayload(store, userId, now) {
+  const user = await findUser(store, userId);
+  const localDateKey = toLocalDateKey(now, user.timezone);
+  const [goals, activeGoal] = await Promise.all([
+    store.listGoalsForUser(userId),
+    store.getActiveGoal(userId)
+  ]);
+
+  if (!activeGoal) {
+    return {
+      user,
+      local_date_key: localDateKey,
+      goals,
+      active_goal: null,
+      today: null,
+      progress: null
+    };
+  }
+
+  const today = await buildTodayTasksPayload(store, user, activeGoal, now);
+  const activePlan = await store.getActivePlan(activeGoal.id);
+  const progress = activePlan ? await getActiveGoalProgress(store, userId, now) : null;
+
+  return {
+    user,
+    local_date_key: localDateKey,
+    goals,
+    active_goal: activeGoal,
+    today,
+    progress
+  };
+}
+
 function lowerDifficulty(difficulty) {
   if (difficulty === TaskDifficulty.HIGH) {
     return TaskDifficulty.MEDIUM;
@@ -244,6 +294,14 @@ export function createApp(overrides = {}) {
     res.status(200).json(observability.snapshot(nowProvider()));
   }));
 
+  app.get("/v1/app/bootstrap", route(async (req, res) => {
+    parseApiRequest("app_bootstrap", { params: {}, body: {} });
+    const userId = getAuthenticatedUserId(req);
+    const payload = await buildAppBootstrapPayload(store, userId, nowProvider());
+
+    respond(res, "app_bootstrap", 200, payload);
+  }));
+
   app.post("/v1/dev/bootstrap", route(async (req, res) => {
     const { body } = parseApiRequest("dev_bootstrap", {
       params: {},
@@ -375,21 +433,9 @@ export function createApp(overrides = {}) {
       const userId = getAuthenticatedUserId(req);
       const user = await findUser(store, userId);
       const activeGoal = await findActiveGoal(store, userId);
-      const now = nowProvider();
-      const localDateKey = toLocalDateKey(now, user.timezone);
-      const plan = await store.getActivePlan(activeGoal.id);
-      const taskRecords = await store.listTasksForLocalDate(activeGoal.id, localDateKey);
-      const tasks = await Promise.all(
-        taskRecords.map(async (task) => mapTask(task, await store.getCompletion(task.id)))
-      );
+      const payload = await buildTodayTasksPayload(store, user, activeGoal, nowProvider());
 
-      respond(res, "today_tasks", 200, {
-        date: localDateKey,
-        goal_id: activeGoal.id,
-        planVersion: plan?.version ?? 1,
-        feedback: "You are set for today. Small steps are enough.",
-        tasks
-      });
+      respond(res, "today_tasks", 200, payload);
   }));
 
   app.post("/v1/tasks/:taskId/complete", route(async (req, res) => {
