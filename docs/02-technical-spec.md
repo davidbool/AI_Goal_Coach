@@ -4,6 +4,9 @@
 - Documentation language is English.
 - MVP architecture prioritizes speed and maintainability over completeness.
 - One active goal per user is enforced by data constraint.
+- The current mobile delivery target is iOS only.
+- Auth remains intentionally minimal during functional validation.
+- AI integration remains mock-first during functional validation.
 
 ## Related Documents
 - Product scope and UX policy: [01-product-and-scope.md](./01-product-and-scope.md)
@@ -11,12 +14,19 @@
 - Agent ownership and handoff rules: [04-agent-execution-instructions.md](./04-agent-execution-instructions.md)
 
 ## System Architecture
-- Mobile client: onboarding UI, daily tasks, progress, notifications UX.
+- iOS client: onboarding UI, daily tasks, progress, notifications UX.
 - API service: auth, goal/task lifecycle, validation, deterministic logic.
 - Worker: asynchronous plan generation, adaptation jobs, reminder jobs.
 - Data layer: relational database with strict goal/task relationships.
 
+## Current Validation Mode
+- Client scope: iOS app only.
+- Auth: minimal bearer/dev-friendly mode is acceptable until the core product flow is validated.
+- AI: mock classifier and mock plan generation are the default until live provider integration begins.
+- Worker, queue, and push integrations remain target architecture and may stay mocked or sync-backed during this phase.
+
 ### Text Diagram
+Target post-validation architecture:
 ```text
 [Mobile App]
   -> [API]
@@ -32,7 +42,7 @@
 
 | Layer | Responsibilities |
 |---|---|
-| Client | Goal input, clarification UI, generation states, task actions, progress views |
+| Client | iOS goal input, clarification UI, generation states, task actions, progress views |
 | API | Goal status transitions, specificity gate, frame classification orchestration, CRUD, metrics |
 | Worker | AI generation, scheduled adaptation, reminder dispatch |
 | AI Integration | Structured output generation, scoring support, fallback behavior |
@@ -69,6 +79,7 @@ How it works:
 - Rule-based checks catch common vague patterns.
 - AI classifier returns specificity score + missing elements.
 - If below threshold, goal enters `needs_clarification` flow.
+- In the current validation cycle, the classifier may remain mock-backed.
 
 ## Minimal Planning Frame Layer
 Where it lives:
@@ -86,6 +97,10 @@ Usage:
 - Reuse frame during adaptation to keep plan consistency.
 
 ## AI Planning Design
+
+Current validation policy:
+- Use deterministic mock outputs by default while validating onboarding, generation states, and daily loop behavior.
+- Defer live model wiring until the core iOS flow is stable enough for real-provider iteration.
 
 ### Input Data
 - Goal text

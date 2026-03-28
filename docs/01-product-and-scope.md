@@ -4,6 +4,8 @@
 - Documentation language is English.
 - The app supports multiple goals per user, but only one goal can be `active` in MVP.
 - Social features are out of MVP and appear only in V1.1/later.
+- The current client delivery target is iOS only; Android is out of scope for the current MVP validation cycle.
+- During the current validation cycle, auth stays minimal and AI remains mock-first until core functionality is proven end-to-end.
 
 ## Related Documents
 - Technical implementation details: [02-technical-spec.md](./02-technical-spec.md)
@@ -27,6 +29,11 @@ AI Goal Coach is a mobile app that helps users achieve long-term goals by conver
 | V1.1 | Optional social invite/compare, richer check-ins, smarter reminder timing |
 | Later | Deeper social features, domain packs, advanced forecasting |
 
+## Platform Scope (Current Cycle)
+- Client work targets iOS only.
+- Android support is intentionally deferred until the iOS MVP flow is validated.
+- Backend APIs may remain platform-neutral, but product decisions and UX validation should optimize for iOS first.
+
 ## Active Goal Policy (MVP)
 - Users may create and keep multiple goals in the system.
 - Exactly one goal can be `active` at a time.
@@ -48,6 +55,11 @@ MVP policy:
 - Guide the user toward a measurable target.
 - Generate timeline/milestones/tasks only after specificity is sufficient.
 - If still vague after clarification rounds, keep goal as `draft` with a clear "needs clarification" state.
+
+## Validation Mode Policy
+- Keep auth lightweight during current functionality validation so product flow friction stays low.
+- Keep AI behavior mock-first during current functionality validation so UX and deterministic behavior can be tested quickly.
+- Add production auth and live AI provider wiring only after the core iOS flow is validated.
 
 ## User Flows
 

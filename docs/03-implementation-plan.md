@@ -4,11 +4,19 @@
 - Documentation language is English.
 - Team size is small startup team or solo founder.
 - MVP-first delivery is the primary objective.
+- Current client delivery is iOS only.
+- Auth and AI integrations should stay minimal until the app's core functionality is validated.
 
 ## Related Documents
 - Product scope and UX: [01-product-and-scope.md](./01-product-and-scope.md)
 - Technical design: [02-technical-spec.md](./02-technical-spec.md)
 - Agent ownership and handoff rules: [04-agent-execution-instructions.md](./04-agent-execution-instructions.md)
+
+## Current Execution Policy
+- Validate the core product flow on iOS before expanding platform scope.
+- Keep auth lightweight during functionality validation; production auth belongs to later hardening.
+- Keep AI mock-first during functionality validation; live provider wiring starts after core flow validation.
+- Prefer deterministic flows and lower integration complexity until the app is behaviorally stable.
 
 ## Phase Plan (0-6)
 
@@ -29,6 +37,11 @@
 4. Daily task execution and same-day soft adjustment.
 5. Full adaptation, streak, and progress.
 6. Notifications and polish.
+
+After those are validated on iOS:
+- Wire production auth.
+- Replace mock-first AI with live provider integration.
+- Reassess Android scope only after the iOS loop is solid.
 
 ## First 2 Weeks Execution Plan
 

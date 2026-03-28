@@ -7,6 +7,8 @@ This document defines implementation instructions for each AI coding agent, with
 - MVP only
 - Vertical slice ownership (not frontend/backend split)
 - Contract-first development
+- Current client scope is iOS only
+- Auth and AI integrations stay intentionally minimal until functionality validation is complete
 
 ## Global Rules (All Agents)
 - Do not change shared contracts unilaterally.
@@ -14,6 +16,8 @@ This document defines implementation instructions for each AI coding agent, with
 - Keep changes inside owned folders unless cross-owner approval is given.
 - Use shared fixtures only; do not invent private fixture formats.
 - Keep social/invite features out of MVP code paths.
+- Do not add Android-specific product work during the current validation cycle unless explicitly requested.
+- Do not expand auth complexity or replace mock-first AI unless the task explicitly targets post-validation integration.
 
 ## Shared Contract Baseline (Must Be Respected)
 - Goal statuses: `draft`, `active`, `paused`, `archived`
