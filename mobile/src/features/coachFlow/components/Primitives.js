@@ -1,0 +1,305 @@
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View
+} from "react-native";
+
+import { getTaskMinutes, humanizeToken } from "../model.js";
+import {
+  styles,
+  toneButtonStyles,
+  toneButtonTextStyles,
+  toneStyles,
+  toneTextStyles
+} from "../../../ui/styles.js";
+
+export function SessionScroll({ busyLabel, coachMessage, errorMessage, children }) {
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={styles.flex}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {coachMessage ? <CoachBanner message={coachMessage} /> : null}
+        {errorMessage ? <ErrorBanner message={errorMessage} /> : null}
+        {children}
+        {busyLabel ? <BusyNotice label={busyLabel} /> : null}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+export function LoadingScreen({ copy, title }) {
+  return (
+    <View style={styles.loadingWrap}>
+      <ActivityIndicator size="large" color="#B65C3A" />
+      <Text style={styles.loadingTitle}>{title}</Text>
+      <Text style={styles.loadingCopy}>{copy}</Text>
+    </View>
+  );
+}
+
+export function HeroPanel({ eyebrow, title, copy, children }) {
+  return (
+    <View style={styles.heroCard}>
+      <Text style={styles.eyebrow}>{eyebrow}</Text>
+      <Text style={styles.heroTitle}>{title}</Text>
+      <Text style={styles.heroCopy}>{copy}</Text>
+      {children}
+    </View>
+  );
+}
+
+export function StepRail({ currentStep }) {
+  return (
+    <View style={styles.stepRail}>
+      {[1, 2, 3, 4].map((step) => (
+        <View key={step} style={styles.stepRailItem}>
+          <View
+            style={[
+              styles.stepRailDot,
+              step <= currentStep ? styles.stepRailDotActive : null
+            ]}
+          >
+            <Text
+              style={[
+                styles.stepRailDotText,
+                step <= currentStep ? styles.stepRailDotTextActive : null
+              ]}
+            >
+              {step}
+            </Text>
+          </View>
+          {step < 4 ? (
+            <View
+              style={[
+                styles.stepRailLine,
+                step < currentStep ? styles.stepRailLineActive : null
+              ]}
+            />
+          ) : null}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+export function GoalRow({
+  actionLabel,
+  compactAction = false,
+  disabled = false,
+  onPress,
+  summary,
+  title
+}) {
+  return (
+    <View style={styles.listRow}>
+      <View style={styles.listRowCopy}>
+        <Text style={styles.listPrimary}>{title}</Text>
+        <Text style={styles.listSecondary}>{summary}</Text>
+      </View>
+      <ActionButton
+        compact={compactAction}
+        disabled={disabled}
+        label={actionLabel}
+        onPress={onPress}
+        tone={disabled ? "muted" : "secondary"}
+      />
+    </View>
+  );
+}
+
+export function TaskCard({ disabled, onComplete, onSkip, task }) {
+  const state = task.state ?? "pending";
+  const isFinished = state === "completed" || state === "skipped";
+
+  return (
+    <View style={styles.taskCard}>
+      <View style={styles.taskCardHeader}>
+        <Text style={styles.taskTitle}>{task.title}</Text>
+        <StatusChip label={humanizeToken(state)} tone={state} />
+      </View>
+      <View style={styles.taskMetaRow}>
+        <StatusChip label={`${getTaskMinutes(task)} min`} tone="neutral" />
+        <StatusChip label={humanizeToken(task.difficulty)} tone={task.difficulty} />
+        {task.required ? <StatusChip label="Required" tone="required" /> : null}
+      </View>
+      {!isFinished ? (
+        <View style={styles.inlineActionRow}>
+          <View style={styles.inlineActionItem}>
+            <ActionButton disabled={disabled} label="Complete" onPress={onComplete} tone="primary" />
+          </View>
+          <View style={styles.inlineActionItem}>
+            <ActionButton disabled={disabled} label="Skip" onPress={onSkip} tone="ghost" />
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+export function MilestoneRow({ disabled, milestone, onConfirm }) {
+  const isPending = milestone.status === "pending";
+
+  return (
+    <View style={styles.listRow}>
+      <View style={styles.listRowCopy}>
+        <Text style={styles.listPrimary}>{milestone.title}</Text>
+        <Text style={styles.listSecondary}>
+          Week {milestone.target_week} · {humanizeToken(milestone.status)}
+        </Text>
+        <Text style={styles.listTertiary}>{milestone.success_criteria}</Text>
+      </View>
+      <ActionButton
+        compact
+        disabled={disabled || !isPending}
+        label={isPending ? "Confirm" : "Done"}
+        onPress={onConfirm}
+        tone={isPending ? "secondary" : "muted"}
+      />
+    </View>
+  );
+}
+
+export function MilestonePreviewRow({ milestone }) {
+  return (
+    <View style={styles.previewRow}>
+      <View style={styles.previewWeekBadge}>
+        <Text style={styles.previewWeekText}>W{milestone.target_week}</Text>
+      </View>
+      <View style={styles.previewCopy}>
+        <Text style={styles.listPrimary}>{milestone.title}</Text>
+        <Text style={styles.listTertiary}>{milestone.success_criteria}</Text>
+      </View>
+    </View>
+  );
+}
+
+export function TaskPreviewRow({ task }) {
+  return (
+    <View style={styles.previewRow}>
+      <View style={styles.previewWeekBadge}>
+        <Text style={styles.previewWeekText}>{getTaskMinutes(task)}m</Text>
+      </View>
+      <View style={styles.previewCopy}>
+        <Text style={styles.listPrimary}>{task.title}</Text>
+        <Text style={styles.listTertiary}>
+          {humanizeToken(task.difficulty)} · {task.required ? "Required" : "Flexible"}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+export function HeroBadge({ label, value }) {
+  return (
+    <View style={styles.heroBadge}>
+      <Text style={styles.heroBadgeLabel}>{label}</Text>
+      <Text style={styles.heroBadgeValue}>{value}</Text>
+    </View>
+  );
+}
+
+export function MetricTile({ label, value }) {
+  return (
+    <View style={styles.metricTile}>
+      <Text style={styles.metricTileLabel}>{label}</Text>
+      <Text style={styles.metricTileValue}>{value}</Text>
+    </View>
+  );
+}
+
+export function StatusChip({ label, tone }) {
+  return (
+    <View style={[styles.statusChip, toneStyles[tone] ?? toneStyles.neutral]}>
+      <Text style={[styles.statusChipText, toneTextStyles[tone] ?? toneTextStyles.neutral]}>{label}</Text>
+    </View>
+  );
+}
+
+export function ActionButton({ compact = false, disabled = false, label, onPress, tone }) {
+  return (
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.buttonBase,
+        toneButtonStyles[tone] ?? toneButtonStyles.secondary,
+        compact ? styles.buttonCompact : null,
+        disabled ? styles.buttonDisabled : null,
+        pressed && !disabled ? styles.buttonPressed : null
+      ]}
+    >
+      <Text
+        style={[
+          styles.buttonText,
+          toneButtonTextStyles[tone] ?? toneButtonTextStyles.secondary,
+          disabled ? styles.buttonTextDisabled : null
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+export function ChoicePill({ active, disabled = false, label, onPress }) {
+  return (
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.choicePill,
+        active ? styles.choicePillActive : null,
+        disabled ? styles.choicePillDisabled : null,
+        pressed && !disabled ? styles.buttonPressed : null
+      ]}
+    >
+      <Text style={[styles.choicePillText, active ? styles.choicePillTextActive : null]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+export function CoachBanner({ message }) {
+  return (
+    <View style={styles.coachBanner}>
+      <Text style={styles.coachBannerText}>{message}</Text>
+    </View>
+  );
+}
+
+export function ErrorBanner({ message }) {
+  return (
+    <View style={styles.errorBanner}>
+      <Text style={styles.errorText}>{message}</Text>
+    </View>
+  );
+}
+
+export function BusyNotice({ label }) {
+  return (
+    <View style={styles.busyFooter}>
+      <ActivityIndicator size="small" color="#B65C3A" />
+      <Text style={styles.busyText}>{label}</Text>
+    </View>
+  );
+}
+
+export function BackgroundArt() {
+  return (
+    <View pointerEvents="none" style={styles.backgroundWrap}>
+      <View style={styles.backgroundBlobTop} />
+      <View style={styles.backgroundBlobLeft} />
+      <View style={styles.backgroundBlobBottom} />
+      <View style={styles.backgroundHalo} />
+    </View>
+  );
+}

@@ -1,0 +1,125 @@
+import { getFlowSurface } from "./model.js";
+import { GoalStudioScreen } from "./screens/GoalStudioScreen.js";
+import { ClarificationScreen } from "./screens/ClarificationScreen.js";
+import { AssessmentScreen } from "./screens/AssessmentScreen.js";
+import { GeneratingScreen } from "./screens/GeneratingScreen.js";
+import { PlanReadyScreen } from "./screens/PlanReadyScreen.js";
+import { GenerationFailedScreen } from "./screens/GenerationFailedScreen.js";
+import { DashboardScreen } from "./screens/DashboardScreen.js";
+
+export function FlowRouter({
+  composer,
+  snapshot,
+  isBusy,
+  onActivateGoal,
+  onBuildPlan,
+  onCancelComposer,
+  onChangeAssessment,
+  onChangeGoalTitle,
+  onClarificationChange,
+  onCompleteTask,
+  onConfirmMilestone,
+  onCreateGoal,
+  onCreateAnotherGoal,
+  onRefreshGenerationStatus,
+  onRefreshSnapshot,
+  onRetryGeneration,
+  onSelectGoalPrompt,
+  onSkipTask,
+  onSoftAdjust,
+  onSubmitClarifications,
+  onSwitchGoal
+}) {
+  const surface = getFlowSurface(snapshot, composer);
+
+  if (surface === "goal_studio") {
+    return (
+      <GoalStudioScreen
+        composer={composer}
+        existingGoals={snapshot.goals.filter((goal) => goal.id !== snapshot.activeGoal?.id)}
+        hasActiveGoal={Boolean(snapshot.activeGoal)}
+        isBusy={isBusy}
+        onActivateGoal={onActivateGoal}
+        onCancel={onCancelComposer}
+        onChangeGoalTitle={onChangeGoalTitle}
+        onCreateGoal={onCreateGoal}
+        onSelectGoalPrompt={onSelectGoalPrompt}
+      />
+    );
+  }
+
+  if (surface === "clarify") {
+    return (
+      <ClarificationScreen
+        composer={composer}
+        isBusy={isBusy}
+        onCancel={onCancelComposer}
+        onChangeAnswer={onClarificationChange}
+        onSubmit={onSubmitClarifications}
+      />
+    );
+  }
+
+  if (surface === "assessment") {
+    return (
+      <AssessmentScreen
+        composer={composer}
+        isBusy={isBusy}
+        onBuildPlan={onBuildPlan}
+        onCancel={onCancelComposer}
+        onChangeAssessment={onChangeAssessment}
+      />
+    );
+  }
+
+  if (surface === "generating") {
+    return (
+      <GeneratingScreen
+        composer={composer}
+        isBusy={isBusy}
+        onCancel={onCancelComposer}
+        onRefreshStatus={onRefreshGenerationStatus}
+      />
+    );
+  }
+
+  if (surface === "plan_ready") {
+    return (
+      <PlanReadyScreen
+        composer={composer}
+        isBusy={isBusy}
+        onActivate={() => onActivateGoal(composer.goalId)}
+        onBackToGoals={onCancelComposer}
+      />
+    );
+  }
+
+  if (surface === "generation_failed") {
+    return (
+      <GenerationFailedScreen
+        composer={composer}
+        isBusy={isBusy}
+        onBack={onCancelComposer}
+        onRetry={onRetryGeneration}
+      />
+    );
+  }
+
+  return (
+    <DashboardScreen
+      activeGoal={snapshot.activeGoal}
+      goals={snapshot.goals}
+      isBusy={isBusy}
+      localDateKey={snapshot.localDateKey}
+      progress={snapshot.progress}
+      today={snapshot.today}
+      onCompleteTask={onCompleteTask}
+      onConfirmMilestone={onConfirmMilestone}
+      onCreateAnotherGoal={onCreateAnotherGoal}
+      onRefresh={onRefreshSnapshot}
+      onSkipTask={onSkipTask}
+      onSoftAdjust={onSoftAdjust}
+      onSwitchGoal={onSwitchGoal}
+    />
+  );
+}
