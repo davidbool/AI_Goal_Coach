@@ -5,10 +5,16 @@ import {
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   View
 } from "react-native";
 
-import { getTaskMinutes, humanizeToken } from "../model.js";
+import {
+  getTaskMinutes,
+  getTaskPreservationIndicator,
+  humanizeToken,
+  TASK_DIFFICULTY_OPTIONS
+} from "../model.js";
 import {
   styles,
   toneButtonStyles,
@@ -117,31 +123,160 @@ export function GoalRow({
   );
 }
 
-export function TaskCard({ disabled, onComplete, onSkip, task }) {
+export function TaskCard({
+  disabled,
+  editingDisabled = false,
+  isEditing = false,
+  onCancelEditing,
+  onChangeEditField,
+  onComplete,
+  onSaveEditing,
+  onSkip,
+  onStartEditing,
+  task,
+  taskEditDraft
+}) {
   const state = task.state ?? "pending";
   const isFinished = state === "completed" || state === "skipped";
+  const preservationIndicator = getTaskPreservationIndicator(task);
+  const actionDisabled = disabled || editingDisabled;
+  const draft = taskEditDraft ?? {
+    title: "",
+    estMinutes: "",
+    difficulty: "medium",
+    required: true
+  };
 
   return (
     <View style={styles.taskCard}>
       <View style={styles.taskCardHeader}>
-        <Text style={styles.taskTitle}>{task.title}</Text>
-        <StatusChip label={humanizeToken(state)} tone={state} />
-      </View>
-      <View style={styles.taskMetaRow}>
-        <StatusChip label={`${getTaskMinutes(task)} min`} tone="neutral" />
-        <StatusChip label={humanizeToken(task.difficulty)} tone={task.difficulty} />
-        {task.required ? <StatusChip label="Required" tone="required" /> : null}
-      </View>
-      {!isFinished ? (
-        <View style={styles.inlineActionRow}>
-          <View style={styles.inlineActionItem}>
-            <ActionButton disabled={disabled} label="Complete" onPress={onComplete} tone="primary" />
-          </View>
-          <View style={styles.inlineActionItem}>
-            <ActionButton disabled={disabled} label="Skip" onPress={onSkip} tone="ghost" />
-          </View>
+        <Text style={styles.taskTitle}>{isEditing ? "Edit task details" : task.title}</Text>
+        <View style={styles.taskHeaderChips}>
+          {preservationIndicator ? (
+            <StatusChip label={preservationIndicator.label} tone={preservationIndicator.tone} />
+          ) : null}
+          <StatusChip label={humanizeToken(state)} tone={state} />
         </View>
-      ) : null}
+      </View>
+      {!isEditing ? (
+        <>
+          <View style={styles.taskMetaRow}>
+            <StatusChip label={`${getTaskMinutes(task)} min`} tone="neutral" />
+            <StatusChip label={humanizeToken(task.difficulty)} tone={task.difficulty} />
+            <StatusChip label={task.required ? "Required" : "Flexible"} tone={task.required ? "required" : "neutral"} />
+          </View>
+          {preservationIndicator ? (
+            <Text style={styles.helperLine}>{preservationIndicator.copy}</Text>
+          ) : null}
+          {!isFinished ? (
+            <View style={styles.taskActionStack}>
+              <View style={styles.inlineActionRow}>
+                <View style={styles.inlineActionItem}>
+                  <ActionButton
+                    disabled={actionDisabled}
+                    label="Complete"
+                    onPress={onComplete}
+                    tone="primary"
+                  />
+                </View>
+                <View style={styles.inlineActionItem}>
+                  <ActionButton
+                    disabled={actionDisabled}
+                    label="Skip"
+                    onPress={onSkip}
+                    tone="ghost"
+                  />
+                </View>
+              </View>
+              <ActionButton
+                compact
+                disabled={actionDisabled}
+                label={task.manual_lock ? "Edit again" : "Edit details"}
+                onPress={onStartEditing}
+                tone="secondary"
+              />
+            </View>
+          ) : null}
+        </>
+      ) : (
+        <>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Title</Text>
+            <TextInput
+              editable={!disabled}
+              onChangeText={(value) => onChangeEditField("title", value)}
+              placeholder="Task title"
+              placeholderTextColor="#8B7E73"
+              style={styles.input}
+              value={draft.title}
+            />
+          </View>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Duration (minutes)</Text>
+            <TextInput
+              editable={!disabled}
+              keyboardType="number-pad"
+              onChangeText={(value) => onChangeEditField("estMinutes", value)}
+              placeholder="25"
+              placeholderTextColor="#8B7E73"
+              style={styles.input}
+              value={draft.estMinutes}
+            />
+          </View>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Difficulty</Text>
+            <View style={styles.pillWrap}>
+              {TASK_DIFFICULTY_OPTIONS.map((option) => (
+                <ChoicePill
+                  key={option}
+                  active={draft.difficulty === option}
+                  disabled={disabled}
+                  label={humanizeToken(option)}
+                  onPress={() => onChangeEditField("difficulty", option)}
+                />
+              ))}
+            </View>
+          </View>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Required</Text>
+            <View style={styles.pillWrap}>
+              <ChoicePill
+                active={draft.required}
+                disabled={disabled}
+                label="Required"
+                onPress={() => onChangeEditField("required", true)}
+              />
+              <ChoicePill
+                active={!draft.required}
+                disabled={disabled}
+                label="Flexible"
+                onPress={() => onChangeEditField("required", false)}
+              />
+            </View>
+          </View>
+          <Text style={styles.helperLine}>
+            Saving manual edits preserves this task during future adaptation.
+          </Text>
+          <View style={styles.inlineActionRow}>
+            <View style={styles.inlineActionItem}>
+              <ActionButton
+                disabled={disabled}
+                label="Save changes"
+                onPress={onSaveEditing}
+                tone="primary"
+              />
+            </View>
+            <View style={styles.inlineActionItem}>
+              <ActionButton
+                disabled={disabled}
+                label="Cancel"
+                onPress={onCancelEditing}
+                tone="ghost"
+              />
+            </View>
+          </View>
+        </>
+      )}
     </View>
   );
 }

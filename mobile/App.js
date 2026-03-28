@@ -8,12 +8,14 @@ import {
   completeTask,
   confirmMilestone,
   createGoal,
+  editTask,
   fetchAppBootstrap,
   fetchPlanStatus,
   generatePlan,
   resetDemoSession,
   skipTask,
   softAdjustActiveGoal,
+  triggerFullAdaptation,
   updateNotificationPreferences,
   submitAssessment,
   submitClarifications
@@ -28,16 +30,20 @@ import {
 import { FlowRouter } from "./src/features/coachFlow/FlowRouter.js";
 import {
   buildNotificationPreferencesPayload,
+  buildTaskEditPayload,
   createNotificationDraft,
   createEmptyComposer,
   createEmptySnapshot,
+  createEmptyTaskEditDraft,
   createGenerationComposerState,
+  createTaskEditDraft,
   notificationDraftMatchesSettings,
   normalizeBootstrap,
   sleep,
   syncComposerWithPlanStatus,
   toClarificationFields,
-  validateNotificationDraft
+  validateNotificationDraft,
+  validateTaskEditDraft
 } from "./src/features/coachFlow/model.js";
 import { DeveloperLab } from "./src/features/coachFlow/screens/DeveloperLab.js";
 import { WelcomeScreen } from "./src/features/coachFlow/screens/WelcomeScreen.js";
@@ -59,6 +65,8 @@ export default function App() {
   const [snapshot, setSnapshot] = useState(createEmptySnapshot());
   const [notificationDraft, setNotificationDraft] = useState(createNotificationDraft());
   const [notificationDirty, setNotificationDirty] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [taskEditDraft, setTaskEditDraft] = useState(createEmptyTaskEditDraft());
   const [composer, setComposer] = useState(createEmptyComposer());
   const [generationScenario, setGenerationScenario] = useState("ready");
   const [devLabOpen, setDevLabOpen] = useState(false);
@@ -72,6 +80,11 @@ export default function App() {
   function syncNotificationDraft(nextNotifications) {
     setNotificationDraft(createNotificationDraft(nextNotifications));
     setNotificationDirtyState(false);
+  }
+
+  function resetTaskEditing() {
+    setEditingTaskId(null);
+    setTaskEditDraft(createEmptyTaskEditDraft());
   }
 
   useEffect(() => {
@@ -121,6 +134,14 @@ export default function App() {
     const normalized = normalizeBootstrap(bootstrap);
 
     setSnapshot(normalized);
+
+    const editingTaskStillPending = normalized.today?.tasks?.some(
+      (task) => task.id === editingTaskId && task.state === "pending"
+    );
+
+    if (editingTaskId && !editingTaskStillPending) {
+      resetTaskEditing();
+    }
 
     if (rehydrateNotifications || !notificationDirtyRef.current) {
       syncNotificationDraft(normalized.notifications);
@@ -204,6 +225,7 @@ export default function App() {
             setGenerationScenario("ready");
             resetComposer("");
             syncNotificationDraft();
+            resetTaskEditing();
             setErrorMessage("");
             setCoachMessage("");
             setDevLabOpen(false);
@@ -226,6 +248,7 @@ export default function App() {
 
       setDevSessionInfo(payload);
       setCoachMessage(`Loaded "${payload.scenario.replace(/_/g, " ")}" so we can design against a stable state.`);
+      resetTaskEditing();
       resetComposer("");
       await loadSnapshot(session, { rehydrateNotifications: true });
     });
@@ -261,6 +284,7 @@ export default function App() {
   function handleStartNewGoal() {
     setCoachMessage("");
     setErrorMessage("");
+    resetTaskEditing();
     setComposer((current) => ({
       ...createEmptyComposer(),
       title: current.title,
@@ -298,6 +322,25 @@ export default function App() {
       setNotificationDirtyState(!notificationDraftMatchesSettings(nextDraft, snapshot.notifications));
       return nextDraft;
     });
+  }
+
+  function handleStartTaskEditing(task) {
+    setErrorMessage("");
+    setEditingTaskId(task.id);
+    setTaskEditDraft(createTaskEditDraft(task));
+  }
+
+  function handleChangeTaskEditField(field, value) {
+    setErrorMessage("");
+    setTaskEditDraft((current) => ({
+      ...current,
+      [field]: value
+    }));
+  }
+
+  function handleCancelTaskEditing() {
+    setErrorMessage("");
+    resetTaskEditing();
   }
 
   async function handleSaveNotifications() {
@@ -522,9 +565,10 @@ export default function App() {
 
     await runBusyAction("Activating this goal", async () => {
       await activateGoal(session.apiBaseUrl, session.userId, goalId);
-      setCoachMessage("Your focus has been switched. Today's dashboard is ready.");
-      resetComposer("");
       await loadSnapshot(session);
+      resetTaskEditing();
+      setCoachMessage("Your focus has been switched. Today's dashboard is refreshed for the active goal.");
+      resetComposer("");
     });
   }
 
@@ -535,8 +579,8 @@ export default function App() {
 
     await runBusyAction("Marking task complete", async () => {
       await completeTask(session.apiBaseUrl, session.userId, taskId, {});
-      setCoachMessage(`Nice work. "${taskTitle}" is now marked complete.`);
       await loadSnapshot(session);
+      setCoachMessage(`Nice work. "${taskTitle}" is complete and the dashboard is back in sync.`);
     });
   }
 
@@ -547,8 +591,35 @@ export default function App() {
 
     await runBusyAction("Skipping task", async () => {
       await skipTask(session.apiBaseUrl, session.userId, taskId, {});
-      setCoachMessage("Skipped tasks are signal, not failure. We can adapt from here.");
       await loadSnapshot(session);
+      setCoachMessage("Skipped tasks are still signal, not failure. The dashboard is refreshed and ready for the next move.");
+    });
+  }
+
+  async function handleSaveTaskEditing(taskId) {
+    if (!session || editingTaskId !== taskId) {
+      return;
+    }
+
+    const validationError = validateTaskEditDraft(taskEditDraft);
+
+    if (validationError) {
+      setErrorMessage(validationError);
+      return;
+    }
+
+    await runBusyAction("Saving task edits", async () => {
+      const result = await editTask(
+        session.apiBaseUrl,
+        session.userId,
+        taskId,
+        buildTaskEditPayload(taskEditDraft)
+      );
+      await loadSnapshot(session);
+      resetTaskEditing();
+      setCoachMessage(
+        `Saved changes to "${result.task.title}". It is now preserved during future adaptation.`
+      );
     });
   }
 
@@ -559,8 +630,28 @@ export default function App() {
 
     await runBusyAction("Lightening today's plan", async () => {
       const adjusted = await softAdjustActiveGoal(session.apiBaseUrl, session.userId);
-      setCoachMessage(adjusted.feedback ?? "We lightened today to protect your momentum.");
       await loadSnapshot(session);
+      resetTaskEditing();
+      setCoachMessage(
+        adjusted.feedback ?? "Today's remaining tasks were softened without changing your plan version."
+      );
+    });
+  }
+
+  async function handleAdaptUpcomingDays() {
+    if (!session) {
+      return;
+    }
+
+    await runBusyAction("Adapting upcoming days", async () => {
+      const adapted = await triggerFullAdaptation(session.apiBaseUrl, session.userId, {
+        triggered_by: "manual"
+      });
+      await loadSnapshot(session);
+      resetTaskEditing();
+      setCoachMessage(
+        `Upcoming days adapted. Plan v${adapted.new_plan_version} is ready, and locked tasks stayed preserved.`
+      );
     });
   }
 
@@ -571,8 +662,8 @@ export default function App() {
 
     await runBusyAction("Confirming milestone", async () => {
       await confirmMilestone(session.apiBaseUrl, session.userId, milestoneId);
-      setCoachMessage(`Milestone confirmed: "${title}".`);
       await loadSnapshot(session);
+      setCoachMessage(`Milestone confirmed: "${title}". Progress is refreshed.`);
     });
   }
 
@@ -626,17 +717,23 @@ export default function App() {
         >
           <FlowRouter
             composer={composer}
+            editingTaskId={editingTaskId}
             notificationDirty={notificationDirty}
             notificationDraft={notificationDraft}
             snapshot={snapshot}
+            taskEditDraft={taskEditDraft}
             isBusy={isBusy}
             onActivateGoal={handleActivateGoal}
+            onAdaptUpcomingDays={handleAdaptUpcomingDays}
             onBuildPlan={handleBuildPlan}
             onCancelComposer={handleCancelComposer}
+            onCancelTaskEdit={handleCancelTaskEditing}
             onChangeAssessment={handleAssessmentChange}
             onChangeGoalTitle={handleChangeGoalTitle}
             onChangeNotificationField={handleChangeNotificationField}
+            onChangeTaskEditField={handleChangeTaskEditField}
             onClarificationChange={handleClarificationChange}
+            onBeginTaskEdit={handleStartTaskEditing}
             onCompleteTask={handleCompleteTask}
             onConfirmMilestone={handleConfirmMilestone}
             onCreateAnotherGoal={handleStartNewGoal}
@@ -645,6 +742,7 @@ export default function App() {
             onRefreshSnapshot={handleRefreshSnapshot}
             onRetryGeneration={handleRetryGeneration}
             onSaveNotifications={handleSaveNotifications}
+            onSaveTaskEdit={handleSaveTaskEditing}
             onSelectGoalPrompt={handleSelectGoalPrompt}
             onSelectNotificationMaxPush={handleSelectNotificationMaxPush}
             onSkipTask={handleSkipTask}

@@ -9,17 +9,23 @@ import { DashboardScreen } from "./screens/DashboardScreen.js";
 
 export function FlowRouter({
   composer,
+  editingTaskId,
   notificationDirty,
   notificationDraft,
   snapshot,
+  taskEditDraft,
   isBusy,
   onActivateGoal,
+  onAdaptUpcomingDays,
   onBuildPlan,
   onCancelComposer,
+  onCancelTaskEdit,
   onChangeAssessment,
   onChangeGoalTitle,
   onChangeNotificationField,
+  onChangeTaskEditField,
   onClarificationChange,
+  onBeginTaskEdit,
   onCompleteTask,
   onConfirmMilestone,
   onCreateGoal,
@@ -28,6 +34,7 @@ export function FlowRouter({
   onRefreshSnapshot,
   onRetryGeneration,
   onSaveNotifications,
+  onSaveTaskEdit,
   onSelectGoalPrompt,
   onSelectNotificationMaxPush,
   onSkipTask,
@@ -113,6 +120,7 @@ export function FlowRouter({
   return (
     <DashboardScreen
       activeGoal={snapshot.activeGoal}
+      editingTaskId={editingTaskId}
       goals={snapshot.goals}
       isBusy={isBusy}
       localDateKey={snapshot.localDateKey}
@@ -120,13 +128,19 @@ export function FlowRouter({
       notificationDraft={notificationDraft}
       notifications={snapshot.notifications}
       progress={snapshot.progress}
+      taskEditDraft={taskEditDraft}
       today={snapshot.today}
+      onAdaptUpcomingDays={onAdaptUpcomingDays}
+      onBeginTaskEdit={onBeginTaskEdit}
+      onCancelTaskEdit={onCancelTaskEdit}
       onChangeNotificationField={onChangeNotificationField}
+      onChangeTaskEditField={onChangeTaskEditField}
       onCompleteTask={onCompleteTask}
       onConfirmMilestone={onConfirmMilestone}
       onCreateAnotherGoal={onCreateAnotherGoal}
       onRefresh={onRefreshSnapshot}
       onSaveNotifications={onSaveNotifications}
+      onSaveTaskEdit={onSaveTaskEdit}
       onSelectNotificationMaxPush={onSelectNotificationMaxPush}
       onSkipTask={onSkipTask}
       onSoftAdjust={onSoftAdjust}

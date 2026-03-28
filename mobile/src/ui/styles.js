@@ -23,6 +23,8 @@ export const toneStyles = {
   pending: { backgroundColor: "#F2E8D9", borderColor: "#E6D7BE" },
   completed: { backgroundColor: "#D9F0E2", borderColor: "#B4D7C4" },
   skipped: { backgroundColor: "#F7E3DB", borderColor: "#E5C3B4" },
+  edited: { backgroundColor: "#DCEBE7", borderColor: "#BFD8D1" },
+  locked: { backgroundColor: "#E7ECF1", borderColor: "#CBD6E0" },
   low: { backgroundColor: "#DCEEDB", borderColor: "#BDD8BC" },
   medium: { backgroundColor: "#F5E4BC", borderColor: "#E7CC85" },
   high: { backgroundColor: "#F7D7C9", borderColor: "#E7B7A4" },
@@ -38,6 +40,8 @@ export const toneTextStyles = {
   pending: { color: "#5F5349" },
   completed: { color: "#2D6950" },
   skipped: { color: "#8A4E38" },
+  edited: { color: "#315D55" },
+  locked: { color: "#4D6170" },
   low: { color: "#35684A" },
   medium: { color: "#7A5A11" },
   high: { color: "#8C4727" },
@@ -486,6 +490,12 @@ export const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 12
   },
+  taskHeaderChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    gap: 8
+  },
   taskTitle: {
     flex: 1,
     color: "#332C27",
@@ -497,6 +507,9 @@ export const styles = StyleSheet.create({
   taskMetaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
+    gap: 10
+  },
+  taskActionStack: {
     gap: 10
   },
   statusChip: {

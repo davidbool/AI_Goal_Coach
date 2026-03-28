@@ -20,6 +20,7 @@ import { styles } from "../../../ui/styles.js";
 
 export function DashboardScreen({
   activeGoal,
+  editingTaskId,
   goals,
   isBusy,
   localDateKey,
@@ -27,13 +28,19 @@ export function DashboardScreen({
   notificationDraft,
   notifications,
   progress,
+  taskEditDraft,
   today,
+  onAdaptUpcomingDays,
+  onBeginTaskEdit,
+  onCancelTaskEdit,
   onChangeNotificationField,
+  onChangeTaskEditField,
   onCompleteTask,
   onConfirmMilestone,
   onCreateAnotherGoal,
   onRefresh,
   onSaveNotifications,
+  onSaveTaskEdit,
   onSelectNotificationMaxPush,
   onSkipTask,
   onSoftAdjust,
@@ -113,9 +120,16 @@ export function DashboardScreen({
               <TaskCard
                 key={task.id}
                 disabled={isBusy}
+                editingDisabled={Boolean(editingTaskId) && editingTaskId !== task.id}
+                isEditing={editingTaskId === task.id}
+                onCancelEditing={onCancelTaskEdit}
+                onChangeEditField={onChangeTaskEditField}
                 onComplete={() => onCompleteTask(task.id, task.title)}
+                onSaveEditing={() => onSaveTaskEdit(task.id)}
                 onSkip={() => onSkipTask(task.id)}
+                onStartEditing={() => onBeginTaskEdit(task)}
                 task={task}
+                taskEditDraft={taskEditDraft}
               />
             ))}
             <ActionButton disabled={isBusy} label="Lighten today" onPress={onSoftAdjust} tone="secondary" />
@@ -220,6 +234,15 @@ export function DashboardScreen({
         <View style={styles.progressBarTrack}>
           <View style={[styles.progressBarFill, { width: adherenceWidth }]} />
         </View>
+        <Text style={styles.mutedCopy}>
+          Use a full adaptation when the next few days need a new plan version instead of a lighter today.
+        </Text>
+        <ActionButton
+          disabled={isBusy}
+          label="Adapt upcoming days"
+          onPress={onAdaptUpcomingDays}
+          tone="secondary"
+        />
       </View>
 
       <View style={styles.card}>
