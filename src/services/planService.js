@@ -134,6 +134,10 @@ export class PlanService {
   }
 
   persistPlan(goalId, payload) {
+    if (typeof this.store.persistGeneratedPlan === "function") {
+      return this.store.persistGeneratedPlan(goalId, payload, this.clock);
+    }
+
     const existing = this.store.plansByGoal.get(goalId) ?? [];
     const nextVersion = existing.length + 1;
 
@@ -156,6 +160,10 @@ export class PlanService {
   }
 
   getLatestPlan(goalId) {
+    if (typeof this.store.getLatestPlan === "function") {
+      return this.store.getLatestPlan(goalId);
+    }
+
     const plans = this.store.plansByGoal.get(goalId) ?? [];
     if (plans.length === 0) {
       return null;

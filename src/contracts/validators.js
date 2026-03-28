@@ -1,7 +1,4 @@
-import {
-  VALID_GOAL_STATUSES,
-  GoalStatus
-} from "./constants.js";
+import { VALID_GOAL_STATUSES } from "./constants.js";
 
 export function assertNonEmptyString(value, field) {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -39,10 +36,6 @@ export function assertOptionalISODate(value, field) {
 export function assertGoalStatusPatch(status) {
   if (!VALID_GOAL_STATUSES.has(status)) {
     throw badRequest(`status must be one of: ${Array.from(VALID_GOAL_STATUSES).join(", ")}`);
-  }
-
-  if (status === GoalStatus.ACTIVE) {
-    throw badRequest("Use POST /v1/goals/:goalId/activate to activate a goal");
   }
 }
 

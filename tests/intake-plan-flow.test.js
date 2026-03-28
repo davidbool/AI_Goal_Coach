@@ -157,6 +157,22 @@ test("M1+M2 full happy path supports clarify, onboarding, generation, and activa
     assert.equal(firstGoal.status, "paused");
     assert.equal(secondGoal.status, "active");
 
+    const repatchFirstActive = await patchJson(baseUrl, `/v1/goals/${goalId}/status`, {
+      status: "active"
+    });
+    assert.equal(repatchFirstActive.status, 200);
+    assert.equal(repatchFirstActive.body.goal.status, "active");
+    assert.ok(repatchFirstActive.body.goal.active_at);
+
+    const listedAfterRepatch = await getJson(baseUrl, "/v1/goals?user_id=user-a");
+    assert.equal(listedAfterRepatch.status, 200);
+
+    const firstAfterRepatch = listedAfterRepatch.body.goals.find((goal) => goal.id === goalId);
+    const secondAfterRepatch = listedAfterRepatch.body.goals.find((goal) => goal.id === secondGoalId);
+
+    assert.equal(firstAfterRepatch.status, "active");
+    assert.equal(secondAfterRepatch.status, "paused");
+
     const pauseSecond = await patchJson(baseUrl, `/v1/goals/${secondGoalId}/status`, {
       status: "paused"
     });

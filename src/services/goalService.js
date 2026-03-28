@@ -29,6 +29,10 @@ export class GoalService {
     assertNonEmptyString(user_id, "user_id");
     assertNonEmptyString(title, "title");
 
+    if (typeof this.store.ensureUser === "function") {
+      this.store.ensureUser(user_id);
+    }
+
     const now = nowIso(this.clock);
     const evaluation = this.specificityService.evaluate(title, []);
 
@@ -148,6 +152,10 @@ export class GoalService {
 
     assertGoalStatusPatch(status);
 
+    if (status === GoalStatus.ACTIVE) {
+      return this.activateGoal(goalId);
+    }
+
     goal.status = status;
     goal.updated_at = nowIso(this.clock);
     if (status !== GoalStatus.ACTIVE) {
@@ -166,10 +174,6 @@ export class GoalService {
 
     if (goal.specificity_state !== SpecificityState.SPECIFIC) {
       throw conflict("Goal must pass specificity clarification before activation");
-    }
-
-    if (!this.store.assessmentByGoal.has(goal.id)) {
-      throw conflict("Goal must include onboarding assessment before activation");
     }
 
     const userGoals = getGoalsForUser(this.store, goal.user_id);
