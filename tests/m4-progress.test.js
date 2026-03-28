@@ -7,11 +7,11 @@ import {
   markTaskCompletedAndRefreshStreak
 } from "../src/modules/m4/progressService.js";
 
-test("progress payload includes streak, adherence, and milestones for progress screen", () => {
+test("progress payload includes streak, adherence, and milestones for progress screen", async () => {
   const store = createMockStore();
   const now = new Date("2026-03-26T12:00:00.000Z");
 
-  const progress = getActiveGoalProgress(store, "user-1", now);
+  const progress = await getActiveGoalProgress(store, "user-1", now);
   const screen = buildProgressScreenModel(progress);
 
   assert.equal(progress.streak.current_days, 2);
@@ -25,11 +25,11 @@ test("progress payload includes streak, adherence, and milestones for progress s
   assert.equal(screen.adherence.completion_rate_7d, 0.5);
 });
 
-test("streak updates when a new day task is completed", () => {
+test("streak updates when a new day task is completed", async () => {
   const store = createMockStore();
 
-  markTaskCompletedAndRefreshStreak(store, "task-3", new Date("2026-03-26T18:00:00.000Z"));
-  const progress = getActiveGoalProgress(store, "user-1", new Date("2026-03-26T18:05:00.000Z"));
+  await markTaskCompletedAndRefreshStreak(store, "task-3", new Date("2026-03-26T18:00:00.000Z"));
+  const progress = await getActiveGoalProgress(store, "user-1", new Date("2026-03-26T18:05:00.000Z"));
 
   assert.equal(progress.streak.current_days, 3);
   assert.equal(progress.streak.longest_days, 3);

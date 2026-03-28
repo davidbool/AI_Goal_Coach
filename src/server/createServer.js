@@ -1,15 +1,18 @@
 import http from "node:http";
 
 import { createApp } from "../app.js";
-import { createInMemoryStore } from "../repositories/inMemoryStore.js";
+import { createConfiguredStore } from "../repositories/storeFactory.js";
 
 export function createServer(overrides = {}) {
   const defaultUserId = overrides.defaultUserId ?? "user-1";
   const store =
     overrides.store ??
-    createInMemoryStore({
+    createConfiguredStore({
       seedDemoData: true,
-      defaultUserId
+      defaultUserId,
+      storeMode: overrides.storeMode,
+      defaultUser: overrides.defaultUser,
+      prisma: overrides.prisma
     });
 
   const { app, services } = createApp({
@@ -19,6 +22,9 @@ export function createServer(overrides = {}) {
   });
 
   const server = http.createServer(app);
+  server.on("close", () => {
+    void store.disconnect?.();
+  });
 
   return {
     app,

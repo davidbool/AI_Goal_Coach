@@ -68,10 +68,10 @@ function calculateCurrentStreak(dateKeySet, referenceDateKey) {
   return { currentDays, lastSuccessDate };
 }
 
-function collectCompletionDateKeys(store, goalId, timeZone) {
-  const completions = store
-    .listCompletionsForGoal(goalId)
-    .filter((completion) => completion.state === "completed");
+async function collectCompletionDateKeys(store, goalId, timeZone) {
+  const completions = (await store.listCompletionsForGoal(goalId)).filter(
+    (completion) => completion.state === "completed"
+  );
 
   return completions
     .map((completion) => {
@@ -86,15 +86,17 @@ function collectCompletionDateKeys(store, goalId, timeZone) {
     .filter(Boolean);
 }
 
-export function recalculateStreak(store, goalId, now, timeZone) {
+export async function recalculateStreak(store, goalId, now, timeZone) {
   const todayKey = toLocalDateKey(now, timeZone);
-  const completionDateKeys = uniqueDateKeys(collectCompletionDateKeys(store, goalId, timeZone));
+  const completionDateKeys = uniqueDateKeys(
+    await collectCompletionDateKeys(store, goalId, timeZone)
+  );
   const completionSet = new Set(completionDateKeys);
 
   const { currentDays, lastSuccessDate } = calculateCurrentStreak(completionSet, todayKey);
   const longestDays = calculateLongestStreak(completionDateKeys);
 
-  const streak = store.upsertStreak(goalId, {
+  const streak = await store.upsertStreak(goalId, {
     current_days: currentDays,
     longest_days: longestDays,
     last_success_date: lastSuccessDate
@@ -103,9 +105,9 @@ export function recalculateStreak(store, goalId, now, timeZone) {
   return streak;
 }
 
-function resolveGoalTimezone(store, goal) {
+async function resolveGoalTimezone(store, goal) {
   if (goal?.user_id && typeof store.getUser === "function") {
-    const goalOwner = store.getUser(goal.user_id);
+    const goalOwner = await store.getUser(goal.user_id);
 
     if (goalOwner?.timezone) {
       return goalOwner.timezone;
@@ -119,36 +121,41 @@ function resolveGoalTimezone(store, goal) {
   return "UTC";
 }
 
-export function markTaskCompletedAndRefreshStreak(store, taskId, now = new Date()) {
-  const completion = store.markTaskCompleted(taskId, now);
+export async function markTaskCompletedAndRefreshStreak(store, taskId, now = new Date()) {
+  const completion = await store.markTaskCompleted(taskId, now);
 
   if (!completion) {
     throw new Error("Task not found");
   }
 
-  const task = store.getTask(taskId);
-  const goal = store.getGoal(task.goal_id);
+  const task = await store.getTask(taskId);
+  const goal = await store.getGoal(task.goal_id);
 
   if (!goal) {
     throw new Error("Goal not found for task");
   }
 
-  recalculateStreak(store, goal.id, now, resolveGoalTimezone(store, goal));
+  await recalculateStreak(store, goal.id, now, await resolveGoalTimezone(store, goal));
 
   return completion;
 }
 
-function buildAdherence(store, goalId, localDateKey) {
+async function buildAdherence(store, goalId, localDateKey) {
   const windowDateKeys = new Set(lastNDatesInclusive(localDateKey, 7));
 
-  const relevantTasks = store
-    .listTasks(goalId)
+  const relevantTasks = (await store
+    .listTasks(goalId))
     .filter((task) => task.required && windowDateKeys.has(task.scheduled_date));
 
-  const tasksCompleted = relevantTasks.filter((task) => {
-    const completion = store.getCompletion(task.id);
-    return completion?.state === "completed";
-  }).length;
+  let tasksCompleted = 0;
+
+  for (const task of relevantTasks) {
+    const completion = await store.getCompletion(task.id);
+
+    if (completion?.state === "completed") {
+      tasksCompleted += 1;
+    }
+  }
 
   const tasksTotal = relevantTasks.length;
   const completionRate = tasksTotal === 0 ? 0 : Number((tasksCompleted / tasksTotal).toFixed(2));
@@ -160,29 +167,29 @@ function buildAdherence(store, goalId, localDateKey) {
   };
 }
 
-export function getActiveGoalProgress(store, userId, now = new Date()) {
-  const user = store.getUser(userId);
+export async function getActiveGoalProgress(store, userId, now = new Date()) {
+  const user = await store.getUser(userId);
 
   if (!user) {
     throw new Error("User not found");
   }
 
-  const goal = store.getActiveGoal(userId);
+  const goal = await store.getActiveGoal(userId);
 
   if (!goal) {
     throw new Error("No active goal found");
   }
 
-  const plan = store.getActivePlan(goal.id);
+  const plan = await store.getActivePlan(goal.id);
 
   if (!plan) {
     throw new Error("No active plan found");
   }
 
   const localDateKey = toLocalDateKey(now, user.timezone);
-  const adherence = buildAdherence(store, goal.id, localDateKey);
-  const streak = recalculateStreak(store, goal.id, now, user.timezone);
-  const milestones = store.getMilestones(plan.id);
+  const adherence = await buildAdherence(store, goal.id, localDateKey);
+  const streak = await recalculateStreak(store, goal.id, now, user.timezone);
+  const milestones = await store.getMilestones(plan.id);
 
   return {
     goal_id: goal.id,

@@ -26,22 +26,34 @@ function validatePreferencesPatch(patch) {
   }
 }
 
-function countIncompleteRequiredTasks(store, goalId, localDateKey) {
+async function countIncompleteRequiredTasks(store, goalId, localDateKey) {
   if (typeof store.countIncompleteRequiredTasks === "function") {
     return store.countIncompleteRequiredTasks(goalId, localDateKey);
   }
 
   if (typeof store.listTasks === "function" && typeof store.getCompletion === "function") {
-    return store
-      .listTasks(goalId)
-      .filter((task) => task.required && task.scheduled_date <= localDateKey)
-      .filter((task) => store.getCompletion(task.id)?.state !== "completed").length;
+    const tasks = await store.listTasks(goalId);
+    let incompleteCount = 0;
+
+    for (const task of tasks) {
+      if (!task.required || task.scheduled_date > localDateKey) {
+        continue;
+      }
+
+      const completion = await store.getCompletion(task.id);
+
+      if (completion?.state !== "completed") {
+        incompleteCount += 1;
+      }
+    }
+
+    return incompleteCount;
   }
 
   return 0;
 }
 
-function hasPushToken(store, userId) {
+async function hasPushToken(store, userId) {
   if (typeof store.hasPushToken === "function") {
     return store.hasPushToken(userId);
   }
@@ -53,7 +65,7 @@ function hasPushToken(store, userId) {
   return false;
 }
 
-function listRemindersForDate(store, userId, localDateKey) {
+async function listRemindersForDate(store, userId, localDateKey) {
   if (typeof store.listRemindersForDate === "function") {
     return store.listRemindersForDate(userId, localDateKey);
   }
@@ -69,12 +81,12 @@ function listRemindersForDate(store, userId, localDateKey) {
   return [];
 }
 
-export function registerPushToken(store, userId, token, platform, now = new Date()) {
+export async function registerPushToken(store, userId, token, platform, now = new Date()) {
   if (!token || typeof token !== "string") {
     throw new Error("token is required");
   }
 
-  if (!store.getUser(userId)) {
+  if (!(await store.getUser(userId))) {
     throw new Error("User not found");
   }
 
@@ -83,8 +95,8 @@ export function registerPushToken(store, userId, token, platform, now = new Date
   return store.upsertPushToken(userId, token, resolvedPlatform, now);
 }
 
-export function updateReminderPreferences(store, userId, patch) {
-  if (!store.getUser(userId)) {
+export async function updateReminderPreferences(store, userId, patch) {
+  if (!(await store.getUser(userId))) {
     throw new Error("User not found");
   }
 
@@ -93,20 +105,20 @@ export function updateReminderPreferences(store, userId, patch) {
   return store.upsertNotificationPreference(userId, patch);
 }
 
-export function evaluateReminderEligibility(store, userId, goalId, now = new Date()) {
-  const user = store.getUser(userId);
+export async function evaluateReminderEligibility(store, userId, goalId, now = new Date()) {
+  const user = await store.getUser(userId);
 
   if (!user) {
     throw new Error("User not found");
   }
 
-  const goal = store.getGoal(goalId);
+  const goal = await store.getGoal(goalId);
 
   if (!goal || goal.user_id !== userId) {
     throw new Error("Goal not found");
   }
 
-  const preference = store.getNotificationPreference(userId);
+  const preference = await store.getNotificationPreference(userId);
 
   if (!preference) {
     throw new Error("Notification preference not found");
@@ -114,9 +126,9 @@ export function evaluateReminderEligibility(store, userId, goalId, now = new Dat
 
   const localDateKey = toLocalDateKey(now, user.timezone);
   const localParts = getLocalDateParts(now, user.timezone);
-  const incompleteRequiredTasks = countIncompleteRequiredTasks(store, goalId, localDateKey);
+  const incompleteRequiredTasks = await countIncompleteRequiredTasks(store, goalId, localDateKey);
 
-  if (!hasPushToken(store, userId)) {
+  if (!(await hasPushToken(store, userId))) {
     return {
       eligible: false,
       blocked_reason: "no_push_token",
@@ -143,7 +155,7 @@ export function evaluateReminderEligibility(store, userId, goalId, now = new Dat
     };
   }
 
-  const sentToday = listRemindersForDate(store, userId, localDateKey).length;
+  const sentToday = (await listRemindersForDate(store, userId, localDateKey)).length;
 
   if (sentToday >= preference.max_push_per_day) {
     return {
@@ -162,8 +174,8 @@ export function evaluateReminderEligibility(store, userId, goalId, now = new Dat
   };
 }
 
-export function sendReminderIfEligible(store, userId, goalId, reason = "daily_reminder", now = new Date()) {
-  const eligibility = evaluateReminderEligibility(store, userId, goalId, now);
+export async function sendReminderIfEligible(store, userId, goalId, reason = "daily_reminder", now = new Date()) {
+  const eligibility = await evaluateReminderEligibility(store, userId, goalId, now);
 
   if (!eligibility.eligible) {
     return {
@@ -174,7 +186,7 @@ export function sendReminderIfEligible(store, userId, goalId, reason = "daily_re
     };
   }
 
-  const reminder = store.createReminder(userId, goalId, reason, now, eligibility.local_date_key);
+  const reminder = await store.createReminder(userId, goalId, reason, now, eligibility.local_date_key);
 
   return {
     sent: true,

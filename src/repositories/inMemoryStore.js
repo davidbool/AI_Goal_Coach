@@ -1,6 +1,5 @@
-import { randomUUID } from "node:crypto";
-
 import { shiftLocalDateKey, toLocalDateKey } from "../utils/dateTime.js";
+import { generateId, nowIso } from "./storeUtils.js";
 
 const DEFAULT_TIMEZONE = "Asia/Jerusalem";
 const DEFAULT_LOCALE = "en-US";
@@ -360,8 +359,98 @@ export function createInMemoryStore(options = {}) {
     return store.goals.get(goalId) ?? null;
   }
 
+  function createGoalRecord(goal) {
+    store.goals.set(goal.id, goal);
+    addGoalToUserIndex(api, goal);
+    store.clarificationsByGoal.set(goal.id, []);
+    return goal;
+  }
+
   function getActiveGoal(userId) {
     return getGoalsForUser(api, userId).find((goal) => goal.status === "active") ?? null;
+  }
+
+  function listGoalsForUser(userId) {
+    return getGoalsForUser(api, userId);
+  }
+
+  function updateGoal(goalId, patch) {
+    const goal = getGoal(goalId);
+
+    if (!goal) {
+      return null;
+    }
+
+    Object.assign(goal, patch);
+    return goal;
+  }
+
+  function activateGoal(goalId, activatedAtIso) {
+    const goal = getGoal(goalId);
+
+    if (!goal) {
+      return null;
+    }
+
+    const userGoals = getGoalsForUser(api, goal.user_id);
+
+    for (const candidate of userGoals) {
+      if (candidate.id === goal.id) {
+        continue;
+      }
+
+      if (candidate.status === "active") {
+        candidate.status = "paused";
+        candidate.active_at = null;
+        candidate.updated_at = activatedAtIso;
+      }
+    }
+
+    goal.status = "active";
+    goal.active_at = activatedAtIso;
+    goal.updated_at = activatedAtIso;
+
+    return goal;
+  }
+
+  function appendClarifications(goalId, clarifications) {
+    const existing = store.clarificationsByGoal.get(goalId) ?? [];
+    const merged = [...existing, ...clarifications];
+    store.clarificationsByGoal.set(goalId, merged);
+    return clarifications;
+  }
+
+  function getClarifications(goalId) {
+    return store.clarificationsByGoal.get(goalId) ?? [];
+  }
+
+  function upsertAssessment(goalId, assessment) {
+    store.assessmentByGoal.set(goalId, assessment);
+    return assessment;
+  }
+
+  function getAssessment(goalId) {
+    return store.assessmentByGoal.get(goalId) ?? null;
+  }
+
+  function getPlanJob(goalId) {
+    return store.planJobsByGoal.get(goalId) ?? null;
+  }
+
+  function savePlanJob(goalId, job) {
+    store.planJobsByGoal.set(goalId, job);
+    return job;
+  }
+
+  function updatePlanJob(goalId, patch) {
+    const job = getPlanJob(goalId);
+
+    if (!job) {
+      return null;
+    }
+
+    Object.assign(job, patch);
+    return job;
   }
 
   function getPlan(planId) {
@@ -425,6 +514,17 @@ export function createInMemoryStore(options = {}) {
 
   function getTask(taskId) {
     return store.tasks.get(taskId) ?? null;
+  }
+
+  function updateTask(taskId, patch) {
+    const task = getTask(taskId);
+
+    if (!task) {
+      return null;
+    }
+
+    Object.assign(task, patch);
+    return task;
   }
 
   function getCompletion(taskId) {
@@ -735,7 +835,18 @@ export function createInMemoryStore(options = {}) {
     adaptJobs: store.adaptJobs,
     ensureUser,
     getUser,
+    createGoalRecord,
+    listGoalsForUser,
     getGoal,
+    updateGoal,
+    activateGoal,
+    appendClarifications,
+    getClarifications,
+    upsertAssessment,
+    getAssessment,
+    getPlanJob,
+    savePlanJob,
+    updatePlanJob,
     getActiveGoal,
     getPlan,
     getLatestPlan,
@@ -749,6 +860,7 @@ export function createInMemoryStore(options = {}) {
     countTasks,
     createAdaptedTask,
     getTask,
+    updateTask,
     getCompletion,
     listCompletionsForGoal,
     upsertCompletion,
@@ -765,7 +877,8 @@ export function createInMemoryStore(options = {}) {
     createReminder,
     markTaskCompleted,
     countIncompleteRequiredTasks,
-    getStateSnapshot
+    getStateSnapshot,
+    disconnect: async () => {}
   };
 
   if (seedDemoData) {
@@ -775,18 +888,10 @@ export function createInMemoryStore(options = {}) {
   return api;
 }
 
-export function generateId(prefix) {
-  return `${prefix}_${randomUUID()}`;
-}
-
 export function addGoalToUserIndex(store, goal) {
   appendToIndex(store.goalsByUser, goal.user_id, goal.id);
 }
 
 export function getGoalsForUser(store, userId) {
   return getIndexedEntities(store.goalsByUser, store.goals, userId);
-}
-
-export function nowIso(clock = Date) {
-  return new clock().toISOString();
 }
