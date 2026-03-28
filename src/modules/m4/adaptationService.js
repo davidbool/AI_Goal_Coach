@@ -1,6 +1,6 @@
 import { shiftLocalDateKey, toLocalDateKey } from "../../utils/dateTime.js";
 
-function listTasksForPlan(store, planId) {
+async function listTasksForPlan(store, planId) {
   if (typeof store.listTasksForPlan === "function") {
     return store.listTasksForPlan(planId);
   }
@@ -12,7 +12,7 @@ function listTasksForPlan(store, planId) {
   return [];
 }
 
-function getTaskCount(store) {
+async function getTaskCount(store) {
   if (typeof store.countTasks === "function") {
     return store.countTasks();
   }
@@ -24,7 +24,7 @@ function getTaskCount(store) {
   return 0;
 }
 
-function persistAdaptedTask(store, task) {
+async function persistAdaptedTask(store, task) {
   if (typeof store.createAdaptedTask === "function") {
     return store.createAdaptedTask(task);
   }
@@ -37,12 +37,12 @@ function persistAdaptedTask(store, task) {
   throw new Error("Task persistence is not available on store");
 }
 
-function cloneTasksIntoNewPlan(store, oldPlanId, newPlanId, now, timeZone) {
+async function cloneTasksIntoNewPlan(store, oldPlanId, newPlanId, now, timeZone) {
   const today = toLocalDateKey(now, timeZone);
   const inSevenDays = shiftLocalDateKey(today, 6);
 
-  const sourceTasks = listTasksForPlan(store, oldPlanId);
-  const nextTaskIndex = getTaskCount(store) + 1;
+  const sourceTasks = await listTasksForPlan(store, oldPlanId);
+  const nextTaskIndex = (await getTaskCount(store)) + 1;
   let createdCount = 0;
 
   for (const task of sourceTasks) {
@@ -63,7 +63,7 @@ function cloneTasksIntoNewPlan(store, oldPlanId, newPlanId, now, timeZone) {
       clonedTask.adjustment_source = "full_adaptation";
     }
 
-    persistAdaptedTask(store, clonedTask);
+    await persistAdaptedTask(store, clonedTask);
 
     createdCount += 1;
   }
@@ -71,37 +71,43 @@ function cloneTasksIntoNewPlan(store, oldPlanId, newPlanId, now, timeZone) {
   return createdCount;
 }
 
-export function triggerFullAdaptation(store, userId, now = new Date(), triggeredBy = "manual") {
+export async function triggerFullAdaptation(store, userId, now = new Date(), triggeredBy = "manual") {
   if (!["manual", "daily_scheduler"].includes(triggeredBy)) {
     throw new Error("Invalid trigger source");
   }
 
-  const user = store.getUser(userId);
+  const user = await store.getUser(userId);
 
   if (!user) {
     throw new Error("User not found");
   }
 
-  const goal = store.getActiveGoal(userId);
+  const goal = await store.getActiveGoal(userId);
 
   if (!goal) {
     throw new Error("No active goal found");
   }
 
-  const activePlan = store.getActivePlan(goal.id);
+  const activePlan = await store.getActivePlan(goal.id);
 
   if (!activePlan) {
     throw new Error("No active plan found");
   }
 
-  const job = store.createAdaptJob(goal.id, userId, activePlan.id, activePlan.version, now);
-  const newPlan = store.createNextPlanVersion(goal.id, activePlan, now, {
+  const job = await store.createAdaptJob(goal.id, userId, activePlan.id, activePlan.version, now);
+  const newPlan = await store.createNextPlanVersion(goal.id, activePlan, now, {
     based_on_plan_id: activePlan.id,
     adaptation_source: "full_adaptation",
     triggered_by: triggeredBy
   });
 
-  const tasksCloned = cloneTasksIntoNewPlan(store, activePlan.id, newPlan.id, now, user.timezone);
+  const tasksCloned = await cloneTasksIntoNewPlan(
+    store,
+    activePlan.id,
+    newPlan.id,
+    now,
+    user.timezone
+  );
 
   return {
     endpoint: "/adapt",

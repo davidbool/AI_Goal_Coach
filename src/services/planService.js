@@ -1,7 +1,7 @@
 import { PlanState, SpecificityState } from "../contracts/constants.js";
 import { GeneratedPlanPayloadSchema } from "../contracts/schemas.js";
 import { conflict } from "../contracts/validators.js";
-import { generateId, nowIso } from "../repositories/inMemoryStore.js";
+import { generateId, nowIso } from "../repositories/storeUtils.js";
 
 export class PlanService {
   constructor({ store, goalService, aiClient, clock = Date }) {
@@ -12,9 +12,9 @@ export class PlanService {
     this.delayThresholdMs = 350;
   }
 
-  triggerGeneration(goalId) {
-    const goal = this.goalService.getGoal(goalId);
-    const assessment = this.goalService.getAssessment(goalId);
+  async triggerGeneration(goalId) {
+    const goal = await this.goalService.getGoal(goalId);
+    const assessment = await this.goalService.getAssessment(goalId);
 
     if (goal.specificity_state !== SpecificityState.SPECIFIC) {
       throw conflict("Goal must be specific before plan generation");
@@ -24,7 +24,7 @@ export class PlanService {
       throw conflict("Onboarding assessment is required before plan generation");
     }
 
-    const existingJob = this.store.planJobsByGoal.get(goalId);
+    const existingJob = await this.store.getPlanJob(goalId);
     if (existingJob && !existingJob.completed_at) {
       return {
         goal_id: goal.id,
@@ -35,7 +35,7 @@ export class PlanService {
     }
 
     const frameType = this.aiClient.classifyFrame(goal.title);
-    const clarifications = this.goalService.getClarifications(goal.id);
+    const clarifications = await this.goalService.getClarifications(goal.id);
 
     const draft = this.aiClient.generatePlanDraft({
       goalText: goal.title,
@@ -56,10 +56,14 @@ export class PlanService {
       completed_at: null
     };
 
-    this.store.planJobsByGoal.set(goal.id, job);
+    await this.store.savePlanJob(goal.id, job);
 
     goal.plan_state = PlanState.GENERATING;
     goal.updated_at = nowIso(this.clock);
+    await this.store.updateGoal(goal.id, {
+      plan_state: goal.plan_state,
+      updated_at: goal.updated_at
+    });
 
     return {
       goal_id: goal.id,
@@ -69,12 +73,12 @@ export class PlanService {
     };
   }
 
-  getStatus(goalId) {
-    const goal = this.goalService.getGoal(goalId);
-    const job = this.store.planJobsByGoal.get(goal.id);
+  async getStatus(goalId) {
+    const goal = await this.goalService.getGoal(goalId);
+    const job = await this.store.getPlanJob(goal.id);
 
     if (!job) {
-      const latest = this.getLatestPlan(goal.id);
+      const latest = await this.getLatestPlan(goal.id);
       return {
         goal_id: goal.id,
         plan_state: goal.plan_state ?? null,
@@ -89,20 +93,36 @@ export class PlanService {
     if (!job.completed_at && now >= delayedAt && now < readyAt) {
       goal.plan_state = PlanState.DELAYED;
       goal.updated_at = nowIso(this.clock);
+      await this.store.updateGoal(goal.id, {
+        plan_state: goal.plan_state,
+        updated_at: goal.updated_at
+      });
     }
 
     if (!job.completed_at && now >= readyAt) {
       if (job.outcome === "failed") {
         goal.plan_state = PlanState.FAILED;
         goal.updated_at = nowIso(this.clock);
-        job.completed_at = nowIso(this.clock);
+        await this.store.updateGoal(goal.id, {
+          plan_state: goal.plan_state,
+          updated_at: goal.updated_at
+        });
+        await this.store.updatePlanJob(goal.id, {
+          completed_at: nowIso(this.clock)
+        });
       } else {
         const validatedPayload = GeneratedPlanPayloadSchema.safeParse(job.payload);
 
         if (!validatedPayload.success) {
           goal.plan_state = PlanState.FAILED;
           goal.updated_at = nowIso(this.clock);
-          job.completed_at = nowIso(this.clock);
+          await this.store.updateGoal(goal.id, {
+            plan_state: goal.plan_state,
+            updated_at: goal.updated_at
+          });
+          await this.store.updatePlanJob(goal.id, {
+            completed_at: nowIso(this.clock)
+          });
 
           return {
             goal_id: goal.id,
@@ -111,10 +131,16 @@ export class PlanService {
           };
         }
 
-        const plan = this.persistPlan(goal.id, validatedPayload.data);
+        const plan = await this.persistPlan(goal.id, validatedPayload.data);
         goal.plan_state = PlanState.READY;
         goal.updated_at = nowIso(this.clock);
-        job.completed_at = nowIso(this.clock);
+        await this.store.updateGoal(goal.id, {
+          plan_state: goal.plan_state,
+          updated_at: goal.updated_at
+        });
+        await this.store.updatePlanJob(goal.id, {
+          completed_at: nowIso(this.clock)
+        });
 
         return {
           goal_id: goal.id,
@@ -124,7 +150,7 @@ export class PlanService {
       }
     }
 
-    const latest = this.getLatestPlan(goal.id);
+    const latest = await this.getLatestPlan(goal.id);
 
     return {
       goal_id: goal.id,
@@ -133,18 +159,15 @@ export class PlanService {
     };
   }
 
-  persistPlan(goalId, payload) {
+  async persistPlan(goalId, payload) {
     if (typeof this.store.persistGeneratedPlan === "function") {
       return this.store.persistGeneratedPlan(goalId, payload, this.clock);
     }
 
-    const existing = this.store.plansByGoal.get(goalId) ?? [];
-    const nextVersion = existing.length + 1;
-
-    const plan = {
+    return {
       id: generateId("plan"),
       goal_id: goalId,
-      version: nextVersion,
+      version: 1,
       frame_type: payload.frame_type,
       feasibility: payload.feasibility,
       estimate: payload.estimate,
@@ -152,24 +175,14 @@ export class PlanService {
       tasks: payload.tasks,
       created_at: nowIso(this.clock)
     };
-
-    existing.push(plan);
-    this.store.plansByGoal.set(goalId, existing);
-
-    return plan;
   }
 
-  getLatestPlan(goalId) {
+  async getLatestPlan(goalId) {
     if (typeof this.store.getLatestPlan === "function") {
       return this.store.getLatestPlan(goalId);
     }
 
-    const plans = this.store.plansByGoal.get(goalId) ?? [];
-    if (plans.length === 0) {
-      return null;
-    }
-
-    return plans[plans.length - 1];
+    return null;
   }
 
   planDisplay(plan) {

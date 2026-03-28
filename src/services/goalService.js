@@ -11,12 +11,7 @@ import {
   conflict,
   notFound
 } from "../contracts/validators.js";
-import {
-  addGoalToUserIndex,
-  generateId,
-  getGoalsForUser,
-  nowIso
-} from "../repositories/inMemoryStore.js";
+import { generateId, nowIso } from "../repositories/storeUtils.js";
 
 export class GoalService {
   constructor({ store, specificityService, clock = Date }) {
@@ -25,12 +20,12 @@ export class GoalService {
     this.clock = clock;
   }
 
-  createGoal({ user_id, title }) {
+  async createGoal({ user_id, title }) {
     assertNonEmptyString(user_id, "user_id");
     assertNonEmptyString(title, "title");
 
     if (typeof this.store.ensureUser === "function") {
-      this.store.ensureUser(user_id);
+      await this.store.ensureUser(user_id);
     }
 
     const now = nowIso(this.clock);
@@ -49,9 +44,7 @@ export class GoalService {
       updated_at: now
     };
 
-    this.store.goals.set(goal.id, goal);
-    addGoalToUserIndex(this.store, goal);
-    this.store.clarificationsByGoal.set(goal.id, []);
+    await this.store.createGoalRecord(goal);
 
     return {
       goal,
@@ -64,14 +57,14 @@ export class GoalService {
     };
   }
 
-  listGoals(userId) {
+  async listGoals(userId) {
     assertNonEmptyString(userId, "user_id");
 
-    return getGoalsForUser(this.store, userId);
+    return this.store.listGoalsForUser(userId);
   }
 
-  getGoal(goalId) {
-    const goal = this.store.goals.get(goalId);
+  async getGoal(goalId) {
+    const goal = await this.store.getGoal(goalId);
 
     if (!goal) {
       throw notFound(`Goal ${goalId} not found`);
@@ -80,15 +73,15 @@ export class GoalService {
     return goal;
   }
 
-  submitClarifications(goalId, answers) {
-    const goal = this.getGoal(goalId);
+  async submitClarifications(goalId, answers) {
+    const goal = await this.getGoal(goalId);
 
     assertArray(answers, "answers");
     if (answers.length === 0) {
       throw conflict("At least one clarification answer is required");
     }
 
-    const existing = this.store.clarificationsByGoal.get(goal.id) ?? [];
+    const existing = await this.store.getClarifications(goal.id);
 
     const persisted = answers.map((item) => {
       assertNonEmptyString(item.question_text, "answers[].question_text");
@@ -104,7 +97,7 @@ export class GoalService {
     });
 
     const merged = [...existing, ...persisted];
-    this.store.clarificationsByGoal.set(goal.id, merged);
+    await this.store.appendClarifications(goal.id, persisted);
 
     const answerTexts = merged.map((entry) => entry.answer_text);
     const evaluation = this.specificityService.evaluate(goal.title, answerTexts);
@@ -112,6 +105,11 @@ export class GoalService {
     goal.specificity_state = evaluation.state;
     goal.specificity_score = Number(evaluation.score.toFixed(2));
     goal.updated_at = nowIso(this.clock);
+    await this.store.updateGoal(goal.id, {
+      specificity_state: goal.specificity_state,
+      specificity_score: goal.specificity_score,
+      updated_at: goal.updated_at
+    });
 
     return {
       goal,
@@ -125,8 +123,8 @@ export class GoalService {
     };
   }
 
-  submitAssessment(goalId, payload) {
-    const goal = this.getGoal(goalId);
+  async submitAssessment(goalId, payload) {
+    const goal = await this.getGoal(goalId);
 
     assertNonEmptyString(payload.current_level, "current_level");
     assertWeeklyMinutes(payload.weekly_minutes_available);
@@ -141,14 +139,17 @@ export class GoalService {
       created_at: nowIso(this.clock)
     };
 
-    this.store.assessmentByGoal.set(goal.id, assessment);
+    await this.store.upsertAssessment(goal.id, assessment);
     goal.updated_at = nowIso(this.clock);
+    await this.store.updateGoal(goal.id, {
+      updated_at: goal.updated_at
+    });
 
     return assessment;
   }
 
-  patchGoalStatus(goalId, status) {
-    const goal = this.getGoal(goalId);
+  async patchGoalStatus(goalId, status) {
+    const goal = await this.getGoal(goalId);
 
     assertGoalStatusPatch(status);
 
@@ -156,17 +157,15 @@ export class GoalService {
       return this.activateGoal(goalId);
     }
 
-    goal.status = status;
-    goal.updated_at = nowIso(this.clock);
-    if (status !== GoalStatus.ACTIVE) {
-      goal.active_at = null;
-    }
-
-    return goal;
+    return this.store.updateGoal(goal.id, {
+      status,
+      updated_at: nowIso(this.clock),
+      active_at: status !== GoalStatus.ACTIVE ? null : goal.active_at
+    });
   }
 
-  activateGoal(goalId) {
-    const goal = this.getGoal(goalId);
+  async activateGoal(goalId) {
+    const goal = await this.getGoal(goalId);
 
     if (goal.status === GoalStatus.ARCHIVED) {
       throw conflict("Archived goals cannot be activated");
@@ -176,34 +175,16 @@ export class GoalService {
       throw conflict("Goal must pass specificity clarification before activation");
     }
 
-    const userGoals = getGoalsForUser(this.store, goal.user_id);
-
-    for (const candidate of userGoals) {
-      if (candidate.id === goal.id) {
-        continue;
-      }
-
-      if (candidate.status === GoalStatus.ACTIVE) {
-        candidate.status = GoalStatus.PAUSED;
-        candidate.active_at = null;
-        candidate.updated_at = nowIso(this.clock);
-      }
-    }
-
-    goal.status = GoalStatus.ACTIVE;
-    goal.active_at = nowIso(this.clock);
-    goal.updated_at = goal.active_at;
-
-    return goal;
+    return this.store.activateGoal(goal.id, nowIso(this.clock));
   }
 
-  getClarifications(goalId) {
-    this.getGoal(goalId);
-    return this.store.clarificationsByGoal.get(goalId) ?? [];
+  async getClarifications(goalId) {
+    await this.getGoal(goalId);
+    return this.store.getClarifications(goalId);
   }
 
-  getAssessment(goalId) {
-    this.getGoal(goalId);
-    return this.store.assessmentByGoal.get(goalId) ?? null;
+  async getAssessment(goalId) {
+    await this.getGoal(goalId);
+    return this.store.getAssessment(goalId);
   }
 }
