@@ -8,6 +8,7 @@
 - The current product validation cycle is iOS only.
 - Minimal auth is intentional during current functionality validation.
 - Mock-first AI behavior is intentional during current functionality validation.
+- Current-cycle simulator validation now lives in `docs/07-current-cycle-ios-simulator-validation-checklist.md`.
 - The checklist below applies when the team moves from functionality validation into launch hardening.
 
 ## Preflight

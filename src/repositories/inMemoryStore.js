@@ -134,9 +134,7 @@ function persistPlanRecord(store, plan) {
 }
 
 function persistMilestoneRecord(store, milestone) {
-  const milestones = store.milestonesByPlan.get(milestone.plan_id) ?? [];
-  milestones.push(milestone);
-  store.milestonesByPlan.set(milestone.plan_id, milestones);
+  appendToIndex(store.milestonesByPlan, milestone.plan_id, milestone.id);
   store.milestones.set(milestone.id, milestone);
   return milestone;
 }

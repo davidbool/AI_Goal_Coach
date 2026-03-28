@@ -12,6 +12,7 @@ import {
   getDashboardPresentation,
   getFlowSurface,
   getGenerationStateContent,
+  isGoalActivatable,
   getTaskPreservationIndicator,
   notificationDraftMatchesSettings,
   normalizeBootstrap,
@@ -116,6 +117,25 @@ test("composer plan status helpers keep the flow transitions deterministic", () 
   assert.equal(ready.stage, "plan_ready");
   assert.equal(ready.plan.version, 1);
   assert.equal(failed.stage, "generation_failed");
+});
+
+test("goal activation helper only enables goals with a ready plan", () => {
+  assert.equal(
+    isGoalActivatable({
+      specificity_state: "specific",
+      plan_state: "ready",
+      status: "paused"
+    }),
+    true
+  );
+  assert.equal(
+    isGoalActivatable({
+      specificity_state: "specific",
+      plan_state: null,
+      status: "draft"
+    }),
+    false
+  );
 });
 
 test("notification draft helpers preserve bootstrap defaults and validate HH:MM fields", () => {

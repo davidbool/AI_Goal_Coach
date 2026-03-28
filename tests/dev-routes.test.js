@@ -38,6 +38,7 @@ test("dev bootstrap seeds a deterministic active-goal scenario and reset clears 
   assert.equal(appBootstrap.body.active_goal.id, goals.body.goals[0].id);
   assert.equal(appBootstrap.body.today.tasks.length, 2);
   assert.equal(appBootstrap.body.progress.goal_id, goals.body.goals[0].id);
+  assert.equal(appBootstrap.body.progress.milestones.length, 2);
 
   const today = await client.request("/v1/goals/active/tasks/today", { method: "GET" });
   assert.equal(today.status, 200);

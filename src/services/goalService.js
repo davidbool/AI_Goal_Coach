@@ -1,5 +1,6 @@
 import {
   GoalStatus,
+  PlanState,
   SpecificityState
 } from "../contracts/constants.js";
 import {
@@ -173,6 +174,10 @@ export class GoalService {
 
     if (goal.specificity_state !== SpecificityState.SPECIFIC) {
       throw conflict("Goal must pass specificity clarification before activation");
+    }
+
+    if (goal.plan_state !== PlanState.READY || !goal.active_plan_id) {
+      throw conflict("Goal needs a ready plan before activation");
     }
 
     return this.store.activateGoal(goal.id, nowIso(this.clock));
