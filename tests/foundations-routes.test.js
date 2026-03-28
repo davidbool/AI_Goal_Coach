@@ -18,6 +18,13 @@ test("all MVP routes exist and return contract-safe mock payloads", async (t) =>
   assert.equal(listGoals.status, 200);
   parseApiResponse("list_goals", listGoals.body);
 
+  const appBootstrap = await client.request("/v1/app/bootstrap", { method: "GET" });
+  assert.equal(appBootstrap.status, 200);
+  parseApiResponse("app_bootstrap", appBootstrap.body);
+  assert.equal(appBootstrap.body.active_goal.id, "goal-1");
+  assert.equal(appBootstrap.body.today.tasks.length > 0, true);
+  assert.equal(appBootstrap.body.progress.goal_id, "goal-1");
+
   const createGoal = await client.request("/v1/goals", {
     method: "POST",
     body: {
@@ -167,7 +174,7 @@ test("all MVP routes exist and return contract-safe mock payloads", async (t) =>
   assert.equal(reminder.status, 200);
   parseApiResponse("send_reminder", reminder.body);
 
-  assert.equal(Object.keys(ApiContracts).length >= 18, true);
+  assert.equal(Object.keys(ApiContracts).length >= 19, true);
 });
 
 test("goal and task routes reject resource access for another user", async (t) => {

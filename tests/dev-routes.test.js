@@ -32,6 +32,13 @@ test("dev bootstrap seeds a deterministic active-goal scenario and reset clears 
   assert.equal(goals.body.goals.length, 1);
   assert.equal(goals.body.goals[0].status, "active");
 
+  const appBootstrap = await client.request("/v1/app/bootstrap", { method: "GET" });
+  assert.equal(appBootstrap.status, 200);
+  parseApiResponse("app_bootstrap", appBootstrap.body);
+  assert.equal(appBootstrap.body.active_goal.id, goals.body.goals[0].id);
+  assert.equal(appBootstrap.body.today.tasks.length, 2);
+  assert.equal(appBootstrap.body.progress.goal_id, goals.body.goals[0].id);
+
   const today = await client.request("/v1/goals/active/tasks/today", { method: "GET" });
   assert.equal(today.status, 200);
   assert.equal(today.body.tasks.length, 2);
@@ -72,6 +79,13 @@ test("dev bootstrap supports no_active_goal and no_tasks_today UI states", async
   assert.equal(noActiveGoal.status, 200);
   assert.equal(noActiveGoal.body.summary.active_goal_id, null);
 
+  const noActiveBootstrap = await client.request("/v1/app/bootstrap", { method: "GET" });
+  assert.equal(noActiveBootstrap.status, 200);
+  parseApiResponse("app_bootstrap", noActiveBootstrap.body);
+  assert.equal(noActiveBootstrap.body.active_goal, null);
+  assert.equal(noActiveBootstrap.body.today, null);
+  assert.equal(noActiveBootstrap.body.progress, null);
+
   const noActiveToday = await client.request("/v1/goals/active/tasks/today", { method: "GET" });
   assert.equal(noActiveToday.status, 404);
 
@@ -85,6 +99,12 @@ test("dev bootstrap supports no_active_goal and no_tasks_today UI states", async
   assert.equal(noTasksToday.status, 200);
   assert.equal(noTasksToday.body.summary.active_goal_id !== null, true);
   assert.equal(noTasksToday.body.summary.today_task_count, 0);
+
+  const noTasksBootstrap = await client.request("/v1/app/bootstrap", { method: "GET" });
+  assert.equal(noTasksBootstrap.status, 200);
+  parseApiResponse("app_bootstrap", noTasksBootstrap.body);
+  assert.equal(noTasksBootstrap.body.active_goal !== null, true);
+  assert.deepEqual(noTasksBootstrap.body.today.tasks, []);
 
   const emptyToday = await client.request("/v1/goals/active/tasks/today", { method: "GET" });
   assert.equal(emptyToday.status, 200);

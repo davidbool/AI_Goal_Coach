@@ -5,10 +5,8 @@ import { StatusBar } from "expo-status-bar";
 import {
   bootstrapDemoSession,
   createGoal,
-  fetchGoals,
+  fetchAppBootstrap,
   fetchPlanStatus,
-  fetchProgress,
-  fetchTodayTasks,
   generatePlan,
   resetDemoSession,
   submitAssessment
@@ -40,10 +38,6 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function isNotFound(error) {
-  return error?.status === 404;
-}
-
 function createEmptyGenerationState() {
   return {
     phase: "idle",
@@ -61,7 +55,10 @@ export default function App() {
   const [errorMessage, setErrorMessage] = useState("");
   const [devSessionInfo, setDevSessionInfo] = useState(null);
   const [snapshot, setSnapshot] = useState({
+    user: null,
+    localDateKey: null,
     goals: [],
+    activeGoal: null,
     today: null,
     progress: null
   });
@@ -110,20 +107,15 @@ export default function App() {
       return;
     }
 
-    const [goalsResponse, todayResponse, progressResponse] = await Promise.all([
-      fetchGoals(activeSession.apiBaseUrl, activeSession.userId),
-      fetchTodayTasks(activeSession.apiBaseUrl, activeSession.userId).catch((error) => (
-        isNotFound(error) ? null : Promise.reject(error)
-      )),
-      fetchProgress(activeSession.apiBaseUrl, activeSession.userId).catch((error) => (
-        isNotFound(error) ? null : Promise.reject(error)
-      ))
-    ]);
+    const bootstrap = await fetchAppBootstrap(activeSession.apiBaseUrl, activeSession.userId);
 
     setSnapshot({
-      goals: goalsResponse.goals ?? [],
-      today: todayResponse,
-      progress: progressResponse?.progress ?? null
+      user: bootstrap.user ?? null,
+      localDateKey: bootstrap.local_date_key ?? null,
+      goals: bootstrap.goals ?? [],
+      activeGoal: bootstrap.active_goal ?? null,
+      today: bootstrap.today ?? null,
+      progress: bootstrap.progress ?? null
     });
   }
 
@@ -191,7 +183,14 @@ export default function App() {
             setSession(null);
             setApiBaseUrlDraft(DEFAULT_API_BASE_URL);
             setDevSessionInfo(null);
-            setSnapshot({ goals: [], today: null, progress: null });
+            setSnapshot({
+              user: null,
+              localDateKey: null,
+              goals: [],
+              activeGoal: null,
+              today: null,
+              progress: null
+            });
             setGenerationState(createEmptyGenerationState());
             setErrorMessage("");
           }
@@ -504,8 +503,12 @@ function DashboardScreen({
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Live Snapshot</Text>
+        {snapshot.localDateKey ? (
+          <Text style={styles.mutedCopy}>Local date: {snapshot.localDateKey}</Text>
+        ) : null}
         <View style={styles.inlinePills}>
           <MetricPill label="Goals" value={String(snapshot.goals.length)} />
+          <MetricPill label="Active" value={snapshot.activeGoal ? "Yes" : "No"} />
           <MetricPill
             label="Today"
             value={snapshot.today ? String(snapshot.today.tasks.length) : "No active goal"}

@@ -238,6 +238,27 @@ export const SpecificityEvaluationSchema = z
   })
   .strict();
 
+export const TodayTasksResponseSchema = z
+  .object({
+    date: IsoDateSchema,
+    goal_id: z.string().optional(),
+    planVersion: z.number().int().min(1).optional(),
+    feedback: z.string().optional(),
+    tasks: z.array(TaskSchema)
+  })
+  .strict();
+
+export const AppBootstrapSchema = z
+  .object({
+    user: UserSchema,
+    local_date_key: IsoDateSchema,
+    goals: z.array(GoalSchema),
+    active_goal: GoalSchema.nullable(),
+    today: TodayTasksResponseSchema.nullable(),
+    progress: ProgressSchema.nullable()
+  })
+  .strict();
+
 export const DevDemoScenarioSchema = z.enum([
   "starter",
   "active_goal_ready",
@@ -292,6 +313,13 @@ export const ApiContracts = {
         goals: z.array(GoalSchema)
       })
       .strict()
+  },
+  app_bootstrap: {
+    method: "GET",
+    path: "/v1/app/bootstrap",
+    params: EmptySchema,
+    body: EmptySchema,
+    response: AppBootstrapSchema
   },
   dev_bootstrap: {
     method: "POST",
@@ -412,15 +440,7 @@ export const ApiContracts = {
     path: "/v1/goals/active/tasks/today",
     params: EmptySchema,
     body: EmptySchema,
-    response: z
-      .object({
-        date: IsoDateSchema,
-        goal_id: z.string().optional(),
-        planVersion: z.number().int().min(1).optional(),
-        feedback: z.string().optional(),
-        tasks: z.array(TaskSchema)
-      })
-      .strict()
+    response: TodayTasksResponseSchema
   },
   complete_task: {
     method: "POST",
