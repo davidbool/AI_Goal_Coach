@@ -356,7 +356,7 @@ function WelcomeScreen({
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>API Base URL</Text>
         <Text style={styles.mutedCopy}>
-          Use `127.0.0.1` for iOS Simulator. Android Emulator often needs `10.0.2.2`.
+          Use `127.0.0.1` for iOS Simulator. The current validation cycle is iOS-only.
         </Text>
         <TextInput
           autoCapitalize="none"

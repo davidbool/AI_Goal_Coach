@@ -4,6 +4,12 @@
 - Validate the MVP release candidate before launch.
 - Confirm the core user journey, notifications, and observability hooks behave as expected.
 
+## Current Validation Mode
+- The current product validation cycle is iOS only.
+- Minimal auth is intentional during current functionality validation.
+- Mock-first AI behavior is intentional during current functionality validation.
+- The checklist below applies when the team moves from functionality validation into launch hardening.
+
 ## Preflight
 - `npm test` passes locally and in CI.
 - `npm run prisma:validate` passes.
