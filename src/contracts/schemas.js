@@ -229,6 +229,16 @@ export const PushTokenSchema = z
   })
   .strict();
 
+export const BootstrapNotificationsSchema = z
+  .object({
+    reminder_time_local: z.string(),
+    quiet_hours_start: z.string(),
+    quiet_hours_end: z.string(),
+    max_push_per_day: z.number().int().min(1).max(2),
+    has_push_token: z.boolean()
+  })
+  .strict();
+
 export const SpecificityEvaluationSchema = z
   .object({
     state: SpecificityStateSchema,
@@ -253,6 +263,7 @@ export const AppBootstrapSchema = z
     user: UserSchema,
     local_date_key: IsoDateSchema,
     goals: z.array(GoalSchema),
+    notifications: BootstrapNotificationsSchema,
     active_goal: GoalSchema.nullable(),
     today: TodayTasksResponseSchema.nullable(),
     progress: ProgressSchema.nullable()

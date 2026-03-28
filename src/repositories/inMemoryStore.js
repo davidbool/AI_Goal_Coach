@@ -1,3 +1,4 @@
+import { DEFAULT_NOTIFICATION_PREFERENCES } from "../contracts/constants.js";
 import { shiftLocalDateKey, toLocalDateKey } from "../utils/dateTime.js";
 import { generateId, nowIso } from "./storeUtils.js";
 
@@ -337,10 +338,7 @@ function seedFoundationData(store, userId) {
   store.notificationPreferencesByUser.set(userId, {
     id: "notif-pref-1",
     user_id: userId,
-    reminder_time_local: "20:00",
-    quiet_hours_start: "22:00",
-    quiet_hours_end: "07:00",
-    max_push_per_day: 2
+    ...DEFAULT_NOTIFICATION_PREFERENCES
   });
 }
 
@@ -612,10 +610,7 @@ export function createInMemoryStore(options = {}) {
     store.notificationPreferencesByUser.set(userId, {
       id: buildDemoId(userId, "notif-pref"),
       user_id: userId,
-      reminder_time_local: "20:00",
-      quiet_hours_start: "22:00",
-      quiet_hours_end: "07:00",
-      max_push_per_day: 2
+      ...DEFAULT_NOTIFICATION_PREFERENCES
     });
 
     return {
@@ -990,10 +985,7 @@ export function createInMemoryStore(options = {}) {
     const created = {
       id: generateId("notif-pref"),
       user_id: userId,
-      reminder_time_local: "20:00",
-      quiet_hours_start: "22:00",
-      quiet_hours_end: "07:00",
-      max_push_per_day: 2,
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
       ...patch
     };
 

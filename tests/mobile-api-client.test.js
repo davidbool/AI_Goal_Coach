@@ -27,6 +27,8 @@ test("mobile API client fetches the initial bootstrap snapshot for an active goa
   assert.equal(bootstrap.today.tasks.length, 2);
   assert.ok(bootstrap.progress);
   assert.equal(bootstrap.progress.goal_id, bootstrap.active_goal.id);
+  assert.equal(bootstrap.notifications.reminder_time_local, "20:00");
+  assert.equal(bootstrap.notifications.has_push_token, false);
 });
 
 test("mobile API client returns null dashboard sections when no goal is active", async (t) => {
@@ -48,4 +50,32 @@ test("mobile API client returns null dashboard sections when no goal is active",
   assert.equal(bootstrap.today, null);
   assert.equal(bootstrap.progress, null);
   assert.equal(bootstrap.goals.length > 0, true);
+  assert.equal(bootstrap.notifications.max_push_per_day, 2);
+});
+
+test("mobile API client exposes effective notifications even before a preference record exists", async (t) => {
+  const now = new Date("2026-03-28T09:00:00.000Z");
+  const { server } = createServer({ nowProvider: () => now, authMode: "required" });
+  const client = await startServer(server, { authUserId: "mobile-ui-user-3" });
+
+  t.after(async () => {
+    await client.stop();
+  });
+
+  const session = await bootstrapDemoSession(client.baseUrl, "mobile-ui-user-3", "starter");
+  assert.equal(session.scenario, "starter");
+
+  const bootstrap = await fetchAppBootstrap(client.baseUrl, "mobile-ui-user-3");
+  parseApiResponse("app_bootstrap", bootstrap);
+
+  assert.equal(bootstrap.active_goal, null);
+  assert.equal(bootstrap.today, null);
+  assert.equal(bootstrap.progress, null);
+  assert.deepEqual(bootstrap.notifications, {
+    reminder_time_local: "20:00",
+    quiet_hours_start: "22:00",
+    quiet_hours_end: "07:00",
+    max_push_per_day: 2,
+    has_push_token: false
+  });
 });

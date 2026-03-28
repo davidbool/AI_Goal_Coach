@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 
+import { DEFAULT_NOTIFICATION_PREFERENCES } from "../contracts/constants.js";
 import { shiftLocalDateKey, toLocalDateKey } from "../utils/dateTime.js";
 import { generateId, nowIso } from "./storeUtils.js";
 
@@ -701,10 +702,10 @@ export function createPrismaStore(options = {}) {
       data: {
         id: "notif-pref-1",
         userId: defaultUserId,
-        reminderTimeLocal: "20:00",
-        quietHoursStart: "22:00",
-        quietHoursEnd: "07:00",
-        maxPushPerDay: 2,
+        reminderTimeLocal: DEFAULT_NOTIFICATION_PREFERENCES.reminder_time_local,
+        quietHoursStart: DEFAULT_NOTIFICATION_PREFERENCES.quiet_hours_start,
+        quietHoursEnd: DEFAULT_NOTIFICATION_PREFERENCES.quiet_hours_end,
+        maxPushPerDay: DEFAULT_NOTIFICATION_PREFERENCES.max_push_per_day,
         createdAt: now,
         updatedAt: now
       }
@@ -1318,10 +1319,10 @@ export function createPrismaStore(options = {}) {
       create: {
         id: generateId("notif-pref"),
         userId,
-        reminderTimeLocal: patch.reminder_time_local ?? "20:00",
-        quietHoursStart: patch.quiet_hours_start ?? "22:00",
-        quietHoursEnd: patch.quiet_hours_end ?? "07:00",
-        maxPushPerDay: patch.max_push_per_day ?? 2
+        reminderTimeLocal: patch.reminder_time_local ?? DEFAULT_NOTIFICATION_PREFERENCES.reminder_time_local,
+        quietHoursStart: patch.quiet_hours_start ?? DEFAULT_NOTIFICATION_PREFERENCES.quiet_hours_start,
+        quietHoursEnd: patch.quiet_hours_end ?? DEFAULT_NOTIFICATION_PREFERENCES.quiet_hours_end,
+        maxPushPerDay: patch.max_push_per_day ?? DEFAULT_NOTIFICATION_PREFERENCES.max_push_per_day
       }
     });
 

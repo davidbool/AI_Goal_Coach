@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createMockStore } from "../src/mocks/inMemoryStore.js";
 import {
   evaluateReminderEligibility,
+  getNotificationSettingsSnapshot,
   registerPushToken,
   sendDelayedPlanReadyIfEligible,
   sendReminderIfEligible,
@@ -29,6 +30,20 @@ test("register push token and update preferences", async () => {
   assert.equal(token.token, "expo-token-1");
   assert.equal(preferences.max_push_per_day, 1);
   assert.equal(preferences.quiet_hours_start, "23:00");
+});
+
+test("notification snapshot falls back to effective defaults when no preference record exists", async () => {
+  const store = createMockStore({ notificationPreferences: [] });
+
+  const snapshot = await getNotificationSettingsSnapshot(store, "user-1");
+
+  assert.deepEqual(snapshot, {
+    reminder_time_local: "20:00",
+    quiet_hours_start: "22:00",
+    quiet_hours_end: "07:00",
+    max_push_per_day: 2,
+    has_push_token: false
+  });
 });
 
 test("reminders send only when tasks remain, within limits, and outside quiet hours", async () => {

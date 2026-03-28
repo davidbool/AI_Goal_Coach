@@ -2,14 +2,18 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildNotificationPreferencesPayload,
+  createNotificationDraft,
   createEmptyComposer,
   createEmptySnapshot,
   createGenerationComposerState,
   getDashboardPresentation,
   getFlowSurface,
   getGenerationStateContent,
+  notificationDraftMatchesSettings,
   normalizeBootstrap,
-  syncComposerWithPlanStatus
+  syncComposerWithPlanStatus,
+  validateNotificationDraft
 } from "../mobile/src/features/coachFlow/model.js";
 
 test("flow surface uses the intake flow before falling back to the dashboard", () => {
@@ -33,6 +37,13 @@ test("bootstrap normalization keeps dashboard fields contract-safe", () => {
     user: { id: "user-1" },
     local_date_key: "2026-03-28",
     goals: [{ id: "goal-1" }],
+    notifications: {
+      reminder_time_local: "21:15",
+      quiet_hours_start: "22:30",
+      quiet_hours_end: "06:45",
+      max_push_per_day: 1,
+      has_push_token: true
+    },
     active_goal: { id: "goal-1" },
     today: { tasks: [] },
     progress: { goal_id: "goal-1" }
@@ -43,6 +54,9 @@ test("bootstrap normalization keeps dashboard fields contract-safe", () => {
   assert.equal(normalized.activeGoal.id, "goal-1");
   assert.equal(normalized.today.tasks.length, 0);
   assert.equal(normalized.progress.goal_id, "goal-1");
+  assert.equal(normalized.notifications.reminderTimeLocal, "21:15");
+  assert.equal(normalized.notifications.maxPushPerDay, 1);
+  assert.equal(normalized.notifications.hasPushToken, true);
 });
 
 test("generation state copy normalizes delayed messaging for the first UI pass", () => {
@@ -98,4 +112,37 @@ test("composer plan status helpers keep the flow transitions deterministic", () 
   assert.equal(ready.stage, "plan_ready");
   assert.equal(ready.plan.version, 1);
   assert.equal(failed.stage, "generation_failed");
+});
+
+test("notification draft helpers preserve bootstrap defaults and validate HH:MM fields", () => {
+  const draft = createNotificationDraft({
+    reminder_time_local: "21:15",
+    quiet_hours_start: "22:30",
+    quiet_hours_end: "06:45",
+    max_push_per_day: 1
+  });
+
+  assert.equal(validateNotificationDraft(draft), null);
+  assert.equal(
+    notificationDraftMatchesSettings(draft, {
+      reminder_time_local: "21:15",
+      quiet_hours_start: "22:30",
+      quiet_hours_end: "06:45",
+      max_push_per_day: 1
+    }),
+    true
+  );
+  assert.deepEqual(buildNotificationPreferencesPayload(draft), {
+    reminder_time_local: "21:15",
+    quiet_hours_start: "22:30",
+    quiet_hours_end: "06:45",
+    max_push_per_day: 1
+  });
+  assert.match(
+    validateNotificationDraft({
+      ...draft,
+      quietHoursEnd: "6:45"
+    }),
+    /HH:MM/
+  );
 });

@@ -238,6 +238,14 @@ export const styles = StyleSheet.create({
   fieldGroup: {
     gap: 8
   },
+  formSplitRow: {
+    flexDirection: "row",
+    gap: 12
+  },
+  formSplitItem: {
+    flex: 1,
+    gap: 8
+  },
   fieldLabel: {
     color: "#554941",
     fontFamily: bodyFont,
