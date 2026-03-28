@@ -4,6 +4,7 @@ import { createMockStore } from "../src/mocks/inMemoryStore.js";
 import {
   evaluateReminderEligibility,
   registerPushToken,
+  sendDelayedPlanReadyIfEligible,
   sendReminderIfEligible,
   updateReminderPreferences
 } from "../src/modules/m5/notificationService.js";
@@ -81,4 +82,35 @@ test("reminders send only when tasks remain, within limits, and outside quiet ho
 
   assert.equal(blockedNoTasks.eligible, false);
   assert.equal(blockedNoTasks.blocked_reason, "no_tasks_remaining");
+});
+
+test("delayed plan ready sends once even when no tasks remain", async () => {
+  const store = createMockStore();
+  await registerPushToken(store, "user-1", "expo-token-1", "ios", new Date("2026-03-26T09:00:00.000Z"));
+  await updateReminderPreferences(store, "user-1", {
+    max_push_per_day: 2,
+    quiet_hours_start: "22:00",
+    quiet_hours_end: "07:00"
+  });
+
+  await markTaskCompletedAndRefreshStreak(store, "task-3", new Date("2026-03-27T10:00:00.000Z"));
+  await markTaskCompletedAndRefreshStreak(store, "task-4", new Date("2026-03-27T10:05:00.000Z"));
+
+  const firstSend = await sendDelayedPlanReadyIfEligible(
+    store,
+    "user-1",
+    "goal-1",
+    new Date("2026-03-27T11:00:00.000Z")
+  );
+  assert.equal(firstSend.sent, true);
+  assert.equal(firstSend.reminder.reason, "delayed_plan_ready");
+
+  const duplicateSend = await sendDelayedPlanReadyIfEligible(
+    store,
+    "user-1",
+    "goal-1",
+    new Date("2026-03-27T11:05:00.000Z")
+  );
+  assert.equal(duplicateSend.sent, false);
+  assert.equal(duplicateSend.blocked_reason, "already_sent");
 });

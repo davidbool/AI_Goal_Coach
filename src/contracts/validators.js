@@ -56,3 +56,9 @@ export function conflict(message) {
   error.status = 409;
   return error;
 }
+
+export function unauthorized(message) {
+  const error = new Error(message);
+  error.status = 401;
+  return error;
+}

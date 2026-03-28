@@ -2,22 +2,20 @@ import express from "express";
 import { ZodError } from "zod";
 
 import { parseApiRequest, parseApiResponse } from "./contracts/schemas.js";
-import { notFound } from "./contracts/validators.js";
+import { badRequest, notFound } from "./contracts/validators.js";
 import { TaskDifficulty, TaskState } from "./contracts/constants.js";
 import { triggerFullAdaptation } from "./modules/m4/adaptationService.js";
 import { confirmMilestoneForActiveGoal } from "./modules/m4/milestoneService.js";
 import { buildProgressScreenModel, getActiveGoalProgress, recalculateStreak } from "./modules/m4/progressService.js";
 import { registerPushToken, sendReminderIfEligible, updateReminderPreferences } from "./modules/m5/notificationService.js";
 import { createConfiguredStore } from "./repositories/storeFactory.js";
+import { createObservability } from "./observability/observability.js";
+import { createAuthMiddleware } from "./server/auth.js";
 import { GoalService } from "./services/goalService.js";
 import { GoalSpecificityService } from "./services/goalSpecificityService.js";
 import { MockAiClient } from "./services/mockAiClient.js";
 import { PlanService } from "./services/planService.js";
 import { toLocalDateKey } from "./utils/dateTime.js";
-
-function resolveUserId(req, defaultUserId) {
-  return String(req.query.user_id ?? req.query.userId ?? defaultUserId);
-}
 
 async function findUser(store, userId) {
   const user = await store.getUser(userId);
@@ -39,6 +37,16 @@ async function findActiveGoal(store, userId) {
   return goal;
 }
 
+async function findGoalForUser(store, goalId, userId) {
+  const goal = await store.getGoal(goalId);
+
+  if (!goal || goal.user_id !== userId) {
+    throw notFound(`Goal ${goalId} not found`);
+  }
+
+  return goal;
+}
+
 async function findTask(store, taskId) {
   const task = await store.getTask(taskId);
 
@@ -47,6 +55,17 @@ async function findTask(store, taskId) {
   }
 
   return task;
+}
+
+async function findTaskForUser(store, taskId, userId) {
+  const task = await findTask(store, taskId);
+  const goal = await store.getGoal(task.goal_id);
+
+  if (!goal || goal.user_id !== userId) {
+    throw notFound(`Task ${taskId} not found`);
+  }
+
+  return { task, goal };
 }
 
 function taskDifficultyAsLabel(difficulty) {
@@ -133,8 +152,17 @@ function route(handler) {
   };
 }
 
+function getAuthenticatedUserId(req) {
+  return req.auth?.userId;
+}
+
+function getObservedRoute(req) {
+  return req.route?.path ?? req.path;
+}
+
 export function createApp(overrides = {}) {
   const defaultUserId = overrides.defaultUserId ?? "demo-user";
+  const authMode = overrides.authMode ?? process.env.GOAL_COACH_AUTH_MODE ?? "dev";
   const store =
     overrides.store ??
     createConfiguredStore({
@@ -147,6 +175,8 @@ export function createApp(overrides = {}) {
   const aiClient = overrides.aiClient ?? new MockAiClient();
   const clock = overrides.clock ?? Date;
   const nowProvider = overrides.nowProvider ?? (() => new clock());
+  const observability =
+    overrides.observability ?? createObservability({ logger: overrides.logger, clock });
 
   const specificityService =
     overrides.specificityService ?? new GoalSpecificityService({ aiClient });
@@ -155,20 +185,60 @@ export function createApp(overrides = {}) {
     overrides.goalService ?? new GoalService({ store, specificityService, clock });
 
   const planService =
-    overrides.planService ?? new PlanService({ store, goalService, aiClient, clock });
+    overrides.planService ?? new PlanService({ store, goalService, aiClient, observability, clock });
 
   const app = express();
   app.use(express.json());
+  app.use((req, res, next) => {
+    const headerRequestId = req.get("x-request-id");
+    const requestId =
+      typeof headerRequestId === "string" && headerRequestId.trim().length > 0
+        ? headerRequestId.trim()
+        : observability.nextRequestId();
+    const startedAt = process.hrtime.bigint();
+
+    req.requestId = requestId;
+    res.setHeader("x-request-id", requestId);
+    res.on("finish", () => {
+      const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+      observability.recordRequest({
+        request_id: requestId,
+        method: req.method,
+        route: getObservedRoute(req),
+        status: res.statusCode,
+        duration_ms: Number(durationMs.toFixed(2)),
+        auth_source: req.auth?.source ?? "unauthenticated",
+        user_id: req.auth?.userId ?? null
+      });
+    });
+
+    next();
+  });
 
   app.get("/health", (_req, res) => {
     res.status(200).json({ ok: true });
   });
 
+  app.use("/v1", createAuthMiddleware({
+    defaultUserId: authMode === "required" ? null : defaultUserId,
+    requireAuth: authMode === "required"
+  }));
+
+  app.get("/v1/ops/metrics", route(async (_req, res) => {
+    res.status(200).json(observability.snapshot(nowProvider()));
+  }));
+
   app.post("/v1/goals", route(async (req, res) => {
     const rawBody = req.body ?? {};
+    const authenticatedUserId = getAuthenticatedUserId(req);
+
+    if (rawBody.user_id !== undefined && typeof rawBody.user_id === "string" && rawBody.user_id !== authenticatedUserId) {
+      throw badRequest("user_id must match authenticated user");
+    }
+
     const { body } = parseApiRequest("create_goal", {
       body: {
-        user_id: rawBody.user_id ?? defaultUserId,
+        user_id: rawBody.user_id ?? authenticatedUserId,
         title: rawBody.title
       }
     });
@@ -178,7 +248,7 @@ export function createApp(overrides = {}) {
   }));
 
   app.get("/v1/goals", route(async (req, res) => {
-    const userId = resolveUserId(req, defaultUserId);
+    const userId = getAuthenticatedUserId(req);
     const goals = await goalService.listGoals(userId);
     respond(res, "list_goals", 200, { goals });
   }));
@@ -188,6 +258,8 @@ export function createApp(overrides = {}) {
         params: req.params,
         body: req.body ?? {}
       });
+      const userId = getAuthenticatedUserId(req);
+      await findGoalForUser(store, params.goalId, userId);
 
       const goal = await goalService.patchGoalStatus(params.goalId, body.status);
       respond(res, "patch_goal_status", 200, { goal });
@@ -198,6 +270,8 @@ export function createApp(overrides = {}) {
         params: req.params,
         body: req.body ?? {}
       });
+      const userId = getAuthenticatedUserId(req);
+      await findGoalForUser(store, params.goalId, userId);
 
       const goal = await goalService.activateGoal(params.goalId);
       respond(res, "activate_goal", 200, { goal });
@@ -208,6 +282,8 @@ export function createApp(overrides = {}) {
         params: req.params,
         body: req.body ?? {}
       });
+      const userId = getAuthenticatedUserId(req);
+      await findGoalForUser(store, params.goalId, userId);
 
       const result = await goalService.submitClarifications(params.goalId, body.answers);
       respond(res, "submit_clarifications", 200, result);
@@ -218,6 +294,8 @@ export function createApp(overrides = {}) {
         params: req.params,
         body: req.body ?? {}
       });
+      const userId = getAuthenticatedUserId(req);
+      await findGoalForUser(store, params.goalId, userId);
 
       const assessment = await goalService.submitAssessment(params.goalId, body);
       respond(res, "submit_assessment", 200, { assessment });
@@ -228,6 +306,8 @@ export function createApp(overrides = {}) {
         params: req.params,
         body: req.body ?? {}
       });
+      const userId = getAuthenticatedUserId(req);
+      await findGoalForUser(store, params.goalId, userId);
 
       const result = await planService.triggerGeneration(params.goalId, body.force);
       respond(res, "generate_plan", 202, result);
@@ -238,13 +318,15 @@ export function createApp(overrides = {}) {
         params: req.params,
         body: {}
       });
+      const userId = getAuthenticatedUserId(req);
+      await findGoalForUser(store, params.goalId, userId);
 
       const status = await planService.getStatus(params.goalId);
       respond(res, "plan_status", 200, status);
   }));
 
   app.get("/v1/goals/active/tasks/today", route(async (req, res) => {
-      const userId = resolveUserId(req, defaultUserId);
+      const userId = getAuthenticatedUserId(req);
       const user = await findUser(store, userId);
       const activeGoal = await findActiveGoal(store, userId);
       const now = nowProvider();
@@ -269,14 +351,14 @@ export function createApp(overrides = {}) {
         params: req.params,
         body: req.body ?? {}
       });
-      const task = await findTask(store, params.taskId);
+      const userId = getAuthenticatedUserId(req);
+      const { task, goal } = await findTaskForUser(store, params.taskId, userId);
       const now = nowProvider();
       const completion = await store.upsertCompletion(task.id, {
         state: TaskState.COMPLETED,
         actual_minutes: body.actual_minutes ?? task.est_minutes,
         completed_at: now.toISOString()
       });
-      const goal = await store.getGoal(task.goal_id);
       const user = goal ? await store.getUser(goal.user_id) : null;
 
       if (goal && user) {
@@ -294,7 +376,8 @@ export function createApp(overrides = {}) {
         params: req.params,
         body: req.body ?? {}
       });
-      const task = await findTask(store, params.taskId);
+      const userId = getAuthenticatedUserId(req);
+      const { task } = await findTaskForUser(store, params.taskId, userId);
       const completion = await store.upsertCompletion(task.id, {
         state: TaskState.SKIPPED,
         actual_minutes: null,
@@ -312,7 +395,8 @@ export function createApp(overrides = {}) {
         params: req.params,
         body: req.body ?? {}
       });
-      const task = await findTask(store, params.taskId);
+      const userId = getAuthenticatedUserId(req);
+      const { task } = await findTaskForUser(store, params.taskId, userId);
 
       const updatedTask = await store.updateTask(task.id, {
         title: body.title ?? task.title,
@@ -332,7 +416,7 @@ export function createApp(overrides = {}) {
   app.post("/v1/goals/active/soft-adjust", route(async (req, res) => {
       parseApiRequest("soft_adjust", { params: {}, body: req.body ?? {} });
 
-      const userId = resolveUserId(req, defaultUserId);
+      const userId = getAuthenticatedUserId(req);
       const user = await findUser(store, userId);
       const activeGoal = await findActiveGoal(store, userId);
       const activePlan = await store.getActivePlan(activeGoal.id);
@@ -376,7 +460,7 @@ export function createApp(overrides = {}) {
 
   app.get("/v1/goals/active/progress", route(async (req, res) => {
       parseApiRequest("progress", { params: {}, body: {} });
-      const userId = resolveUserId(req, defaultUserId);
+      const userId = getAuthenticatedUserId(req);
       const progress = await getActiveGoalProgress(store, userId, nowProvider());
 
       respond(res, "progress", 200, {
@@ -390,7 +474,7 @@ export function createApp(overrides = {}) {
         params: req.params,
         body: req.body ?? {}
       });
-      const userId = resolveUserId(req, defaultUserId);
+      const userId = getAuthenticatedUserId(req);
       const milestone = await confirmMilestoneForActiveGoal(
         store,
         userId,
@@ -406,7 +490,7 @@ export function createApp(overrides = {}) {
         params: {},
         body: req.body ?? {}
       });
-      const userId = resolveUserId(req, defaultUserId);
+      const userId = getAuthenticatedUserId(req);
       const result = await triggerFullAdaptation(
         store,
         userId,
@@ -422,7 +506,7 @@ export function createApp(overrides = {}) {
         params: {},
         body: req.body ?? {}
       });
-      const userId = resolveUserId(req, defaultUserId);
+      const userId = getAuthenticatedUserId(req);
       await store.ensureUser?.(userId);
       const token = await registerPushToken(store, userId, body.token, body.platform, nowProvider());
 
@@ -434,7 +518,7 @@ export function createApp(overrides = {}) {
         params: {},
         body: req.body ?? {}
       });
-      const userId = resolveUserId(req, defaultUserId);
+      const userId = getAuthenticatedUserId(req);
       await store.ensureUser?.(userId);
       const preference = await updateReminderPreferences(store, userId, body);
 
@@ -446,7 +530,7 @@ export function createApp(overrides = {}) {
         params: {},
         body: req.body ?? {}
       });
-      const userId = resolveUserId(req, defaultUserId);
+      const userId = getAuthenticatedUserId(req);
       const activeGoal = await store.getActiveGoal(userId);
       const goalId = body.goal_id ?? activeGoal?.id;
 
@@ -461,6 +545,11 @@ export function createApp(overrides = {}) {
         body.reason ?? "daily_reminder",
         nowProvider()
       );
+      observability.recordReminder(result, {
+        reason: body.reason ?? "daily_reminder",
+        goal_id: goalId,
+        user_id: userId
+      });
       respond(res, "send_reminder", 200, result);
   }));
 
@@ -468,14 +557,23 @@ export function createApp(overrides = {}) {
     next(notFound(`Route not found: ${req.method} ${req.path}`));
   });
 
-  app.use((error, _req, res, _next) => {
+  app.use((error, req, res, _next) => {
     const status = classifyStatus(error);
+    observability.recordError({
+      request_id: req.requestId ?? null,
+      method: req.method,
+      route: getObservedRoute(req),
+      status,
+      message: error?.message ?? "Internal server error",
+      user_id: req.auth?.userId ?? null
+    });
     res.status(status).json({
       error: {
-        message: error?.message ?? "Internal server error"
+        message: error?.message ?? "Internal server error",
+        request_id: req.requestId ?? null
       }
     });
   });
 
-  return { app, services: { goalService, planService, specificityService }, store };
+  return { app, services: { goalService, planService, specificityService }, store, observability };
 }

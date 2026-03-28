@@ -1,3 +1,4 @@
+import { ReminderReason } from "../../contracts/constants.js";
 import { getLocalDateParts, isWithinQuietHours, parseTimeHHMM, toLocalDateKey } from "../../utils/dateTime.js";
 
 function requirePatchObject(patch) {
@@ -81,6 +82,30 @@ async function listRemindersForDate(store, userId, localDateKey) {
   return [];
 }
 
+async function hasReminderBeenSent(store, userId, goalId, reason) {
+  if (typeof store.hasReminderBeenSent === "function") {
+    return store.hasReminderBeenSent(userId, goalId, reason);
+  }
+
+  if (Array.isArray(store.state?.remindersSent)) {
+    return store.state.remindersSent.some((reminder) => (
+      reminder.user_id === userId &&
+      reminder.goal_id === goalId &&
+      reminder.reason === reason
+    ));
+  }
+
+  if (Array.isArray(store.remindersSent)) {
+    return store.remindersSent.some((reminder) => (
+      reminder.user_id === userId &&
+      reminder.goal_id === goalId &&
+      reminder.reason === reason
+    ));
+  }
+
+  return false;
+}
+
 export async function registerPushToken(store, userId, token, platform, now = new Date()) {
   if (!token || typeof token !== "string") {
     throw new Error("token is required");
@@ -105,7 +130,13 @@ export async function updateReminderPreferences(store, userId, patch) {
   return store.upsertNotificationPreference(userId, patch);
 }
 
-export async function evaluateReminderEligibility(store, userId, goalId, now = new Date()) {
+export async function evaluateReminderEligibility(
+  store,
+  userId,
+  goalId,
+  now = new Date(),
+  reason = ReminderReason.DAILY_REMINDER
+) {
   const user = await store.getUser(userId);
 
   if (!user) {
@@ -121,7 +152,12 @@ export async function evaluateReminderEligibility(store, userId, goalId, now = n
   const preference = await store.getNotificationPreference(userId);
 
   if (!preference) {
-    throw new Error("Notification preference not found");
+    return {
+      eligible: false,
+      blocked_reason: "notification_preference_not_found",
+      local_date_key: toLocalDateKey(now, user.timezone),
+      incomplete_required_tasks: 0
+    };
   }
 
   const localDateKey = toLocalDateKey(now, user.timezone);
@@ -137,7 +173,22 @@ export async function evaluateReminderEligibility(store, userId, goalId, now = n
     };
   }
 
-  if (incompleteRequiredTasks <= 0) {
+  if (
+    reason === ReminderReason.DELAYED_PLAN_READY &&
+    await hasReminderBeenSent(store, userId, goalId, reason)
+  ) {
+    return {
+      eligible: false,
+      blocked_reason: "already_sent",
+      local_date_key: localDateKey,
+      incomplete_required_tasks: incompleteRequiredTasks
+    };
+  }
+
+  if (
+    reason === ReminderReason.DAILY_REMINDER &&
+    incompleteRequiredTasks <= 0
+  ) {
     return {
       eligible: false,
       blocked_reason: "no_tasks_remaining",
@@ -175,7 +226,7 @@ export async function evaluateReminderEligibility(store, userId, goalId, now = n
 }
 
 export async function sendReminderIfEligible(store, userId, goalId, reason = "daily_reminder", now = new Date()) {
-  const eligibility = await evaluateReminderEligibility(store, userId, goalId, now);
+  const eligibility = await evaluateReminderEligibility(store, userId, goalId, now, reason);
 
   if (!eligibility.eligible) {
     return {
@@ -195,4 +246,8 @@ export async function sendReminderIfEligible(store, userId, goalId, reason = "da
     incomplete_required_tasks: eligibility.incomplete_required_tasks,
     reminder
   };
+}
+
+export async function sendDelayedPlanReadyIfEligible(store, userId, goalId, now = new Date()) {
+  return sendReminderIfEligible(store, userId, goalId, ReminderReason.DELAYED_PLAN_READY, now);
 }

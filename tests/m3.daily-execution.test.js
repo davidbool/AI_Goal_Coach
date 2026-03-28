@@ -9,9 +9,11 @@ import { renderTodayScreen } from "../src/m3/todayScreen.js";
 
 test("today screen fetches active goal tasks and displays them", async () => {
   let requestedPath = null;
+  let authorizationHeader = null;
 
-  const fetchImpl = async (url) => {
+  const fetchImpl = async (url, init) => {
     requestedPath = new URL(url, "https://goalcoach.local").pathname;
+    authorizationHeader = init.headers.Authorization;
     return new Response(
       JSON.stringify({
         date: "2026-03-26",
@@ -34,12 +36,13 @@ test("today screen fetches active goal tasks and displays them", async () => {
     );
   };
 
-  const api = new M3ApiClient({ baseUrl: "/v1", fetchImpl });
+  const api = new M3ApiClient({ baseUrl: "/v1", fetchImpl, authToken: "user-1" });
   const loop = new DailyExecutionLoop({ api });
 
   await loop.loadToday();
 
   assert.equal(requestedPath, "/v1/goals/active/tasks/today");
+  assert.equal(authorizationHeader, "Bearer user-1");
   const screen = renderTodayScreen(loop.getState());
   assert.match(screen, /Write 150 words/);
 });
