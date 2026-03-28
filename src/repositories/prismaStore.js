@@ -1368,6 +1368,15 @@ export function createPrismaStore(options = {}) {
     return remindersSent.filter((reminder) => reminder.user_id === userId && reminder.local_date_key === localDateKey);
   }
 
+  async function hasReminderBeenSent(userId, goalId, reason) {
+    await ready();
+    return remindersSent.some((reminder) => (
+      reminder.user_id === userId &&
+      reminder.goal_id === goalId &&
+      reminder.reason === reason
+    ));
+  }
+
   async function createReminder(userId, goalId, reason, now, localDateKey) {
     await ready();
     const reminder = {
@@ -1496,6 +1505,7 @@ export function createPrismaStore(options = {}) {
     upsertPushToken,
     hasPushToken,
     listRemindersForDate,
+    hasReminderBeenSent,
     createReminder,
     markTaskCompleted,
     countIncompleteRequiredTasks,

@@ -169,3 +169,69 @@ test("all MVP routes exist and return contract-safe mock payloads", async (t) =>
 
   assert.equal(Object.keys(ApiContracts).length >= 18, true);
 });
+
+test("goal and task routes reject resource access for another user", async (t) => {
+  const now = new Date("2026-03-26T12:00:00.000Z");
+  const { server } = createServer({ nowProvider: () => now });
+  const client = await startServer(server);
+
+  t.after(async () => {
+    await client.stop();
+  });
+
+  const foreignGoal = await client.request("/v1/goals/goal-1/activate", {
+    method: "POST",
+    body: {},
+    authUserId: "user-2"
+  });
+  assert.equal(foreignGoal.status, 404);
+  assert.match(foreignGoal.body.error.message, /Goal goal-1 not found/);
+
+  const mismatchedCreate = await client.request("/v1/goals", {
+    method: "POST",
+    authUserId: "user-1",
+    body: {
+      user_id: "user-2",
+      title: "Ship onboarding improvements by 2026-09-01"
+    }
+  });
+  assert.equal(mismatchedCreate.status, 400);
+  assert.match(mismatchedCreate.body.error.message, /user_id must match authenticated user/);
+
+  const todayTasks = await client.request("/v1/goals/active/tasks/today", { method: "GET" });
+  assert.equal(todayTasks.status, 200);
+  const firstTask = todayTasks.body.tasks[0];
+
+  const foreignTask = await client.request(`/v1/tasks/${firstTask.id}/complete`, {
+    method: "POST",
+    body: {
+      actual_minutes: firstTask.est_minutes
+    },
+    authUserId: "user-2"
+  });
+  assert.equal(foreignTask.status, 404);
+  assert.match(foreignTask.body.error.message, new RegExp(`Task ${firstTask.id} not found`));
+});
+
+test("required auth mode rejects missing or malformed authorization headers", async (t) => {
+  const now = new Date("2026-03-26T12:00:00.000Z");
+  const { server } = createServer({ nowProvider: () => now, authMode: "required" });
+  const client = await startServer(server, { authUserId: null });
+
+  t.after(async () => {
+    await client.stop();
+  });
+
+  const missingAuth = await client.request("/v1/goals", { method: "GET" });
+  assert.equal(missingAuth.status, 401);
+  assert.match(missingAuth.body.error.message, /Authorization header is required/);
+
+  const malformedAuth = await client.request("/v1/goals", {
+    method: "GET",
+    headers: {
+      authorization: "Token user-1"
+    }
+  });
+  assert.equal(malformedAuth.status, 401);
+  assert.match(malformedAuth.body.error.message, /Authorization header must use Bearer token/);
+});

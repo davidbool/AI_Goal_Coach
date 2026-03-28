@@ -36,10 +36,11 @@ async function readErrorMessage(response) {
 }
 
 export class M3ApiClient {
-  constructor({ baseUrl = DEFAULT_BASE_URL, fetchImpl = globalThis.fetch, mockAdapter = null } = {}) {
+  constructor({ baseUrl = DEFAULT_BASE_URL, fetchImpl = globalThis.fetch, mockAdapter = null, authToken = null } = {}) {
     this.baseUrl = baseUrl;
     this.fetchImpl = fetchImpl;
     this.mockAdapter = mockAdapter;
+    this.authToken = authToken;
 
     if (!this.mockAdapter && typeof this.fetchImpl !== "function") {
       throw new Error("M3ApiClient requires fetchImpl when no mockAdapter is provided.");
@@ -94,7 +95,8 @@ export class M3ApiClient {
     const hasJsonBody = Boolean(init?.body) && !isFormDataBody;
     const headers = {
       Accept: "application/json",
-      ...(hasJsonBody ? { "Content-Type": "application/json" } : {})
+      ...(hasJsonBody ? { "Content-Type": "application/json" } : {}),
+      ...(this.authToken ? { Authorization: `Bearer ${this.authToken}` } : {})
     };
 
     const response = await this.fetchImpl(joinPath(this.baseUrl, path), {

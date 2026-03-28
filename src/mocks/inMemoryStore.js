@@ -393,6 +393,14 @@ export function createMockStore(overrides = {}) {
     return state.remindersSent.filter((reminder) => reminder.user_id === userId && reminder.local_date_key === localDateKey);
   }
 
+  function hasReminderBeenSent(userId, goalId, reason) {
+    return state.remindersSent.some((reminder) => (
+      reminder.user_id === userId &&
+      reminder.goal_id === goalId &&
+      reminder.reason === reason
+    ));
+  }
+
   function createReminder(userId, goalId, reason, now, localDateKey) {
     const reminder = {
       id: nextId.reminder(),
@@ -474,6 +482,7 @@ export function createMockStore(overrides = {}) {
     upsertPushToken,
     hasPushToken,
     listRemindersForDate,
+    hasReminderBeenSent,
     createReminder,
     markTaskCompleted,
     countIncompleteRequiredTasks,

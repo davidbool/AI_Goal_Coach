@@ -759,6 +759,14 @@ export function createInMemoryStore(options = {}) {
     return store.remindersSent.filter((reminder) => reminder.user_id === userId && reminder.local_date_key === localDateKey);
   }
 
+  function hasReminderBeenSent(userId, goalId, reason) {
+    return store.remindersSent.some((reminder) => (
+      reminder.user_id === userId &&
+      reminder.goal_id === goalId &&
+      reminder.reason === reason
+    ));
+  }
+
   function createReminder(userId, goalId, reason, now, localDateKey) {
     const reminder = {
       id: generateId("reminder"),
@@ -874,6 +882,7 @@ export function createInMemoryStore(options = {}) {
     upsertPushToken,
     hasPushToken,
     listRemindersForDate,
+    hasReminderBeenSent,
     createReminder,
     markTaskCompleted,
     countIncompleteRequiredTasks,

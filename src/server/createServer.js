@@ -15,7 +15,7 @@ export function createServer(overrides = {}) {
       prisma: overrides.prisma
     });
 
-  const { app, services } = createApp({
+  const { app, services, observability } = createApp({
     ...overrides,
     defaultUserId,
     store
@@ -30,6 +30,7 @@ export function createServer(overrides = {}) {
     app,
     server,
     services,
-    store
+    store,
+    observability
   };
 }

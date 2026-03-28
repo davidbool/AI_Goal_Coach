@@ -19,7 +19,7 @@ async function parseResponseBody(response) {
   }
 }
 
-export async function startServer(server) {
+export async function startServer(server, { authUserId = "user-1" } = {}) {
   server.listen(0);
   await once(server, "listening");
   const address = server.address();
@@ -30,10 +30,16 @@ export async function startServer(server) {
 
   const baseUrl = `http://127.0.0.1:${address.port}`;
 
-  async function request(path, { method = "GET", body } = {}) {
-    const headers = {};
+  async function request(path, { method = "GET", body, headers: extraHeaders = {}, authUserId: requestAuthUserId = authUserId } = {}) {
+    const headers = { ...extraHeaders };
     const payload =
       body === undefined || body === null ? undefined : JSON.stringify(body);
+
+    const hasAuthorizationHeader = Object.keys(headers).some((header) => header.toLowerCase() === "authorization");
+
+    if (!hasAuthorizationHeader && requestAuthUserId !== undefined && requestAuthUserId !== null) {
+      headers.authorization = `Bearer ${requestAuthUserId}`;
+    }
 
     if (payload !== undefined) {
       headers["content-type"] = "application/json";
