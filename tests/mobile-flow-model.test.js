@@ -2,18 +2,22 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildTaskEditPayload,
   buildNotificationPreferencesPayload,
   createNotificationDraft,
   createEmptyComposer,
   createEmptySnapshot,
+  createTaskEditDraft,
   createGenerationComposerState,
   getDashboardPresentation,
   getFlowSurface,
   getGenerationStateContent,
+  getTaskPreservationIndicator,
   notificationDraftMatchesSettings,
   normalizeBootstrap,
   syncComposerWithPlanStatus,
-  validateNotificationDraft
+  validateNotificationDraft,
+  validateTaskEditDraft
 } from "../mobile/src/features/coachFlow/model.js";
 
 test("flow surface uses the intake flow before falling back to the dashboard", () => {
@@ -145,4 +149,49 @@ test("notification draft helpers preserve bootstrap defaults and validate HH:MM 
     }),
     /HH:MM/
   );
+});
+
+test("task edit draft helpers validate the full edit contract before submit", () => {
+  const draft = createTaskEditDraft({
+    title: "  Rewrite the pending task card  ",
+    est_minutes: 25,
+    difficulty: "high",
+    required: false
+  });
+
+  assert.equal(validateTaskEditDraft(draft), null);
+  assert.deepEqual(buildTaskEditPayload(draft), {
+    title: "Rewrite the pending task card",
+    est_minutes: 25,
+    difficulty: "high",
+    required: false
+  });
+  assert.match(
+    validateTaskEditDraft({
+      ...draft,
+      estMinutes: "0"
+    }),
+    /greater than zero/i
+  );
+  assert.match(
+    validateTaskEditDraft({
+      ...draft,
+      title: "   "
+    }),
+    /cannot be empty/i
+  );
+});
+
+test("task preservation indicators distinguish edited tasks from generic locks", () => {
+  assert.deepEqual(getTaskPreservationIndicator({ manual_lock: true, source: "manual" }), {
+    label: "Edited",
+    tone: "edited",
+    copy: "Preserved during future adaptation."
+  });
+  assert.deepEqual(getTaskPreservationIndicator({ manual_lock: true, source: "plan" }), {
+    label: "Locked",
+    tone: "locked",
+    copy: "Preserved during future adaptation."
+  });
+  assert.equal(getTaskPreservationIndicator({ manual_lock: false, source: "manual" }), null);
 });

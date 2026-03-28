@@ -115,6 +115,78 @@ export function buildNotificationPreferencesPayload(draft) {
   };
 }
 
+export const TASK_DIFFICULTY_OPTIONS = Object.freeze(["low", "medium", "high"]);
+
+export function createEmptyTaskEditDraft() {
+  return {
+    title: "",
+    estMinutes: "",
+    difficulty: "medium",
+    required: true
+  };
+}
+
+export function createTaskEditDraft(task = {}) {
+  return {
+    title: String(task.title ?? ""),
+    estMinutes:
+      task.est_minutes === undefined || task.est_minutes === null ? "" : String(task.est_minutes),
+    difficulty: TASK_DIFFICULTY_OPTIONS.includes(task.difficulty) ? task.difficulty : "medium",
+    required: Boolean(task.required)
+  };
+}
+
+export function validateTaskEditDraft(draft) {
+  if (!draft.title.trim()) {
+    return "Task title cannot be empty.";
+  }
+
+  const duration = String(draft.estMinutes ?? "").trim();
+
+  if (!/^\d+$/.test(duration) || Number(duration) <= 0) {
+    return "Task duration must be a whole number greater than zero.";
+  }
+
+  if (!TASK_DIFFICULTY_OPTIONS.includes(draft.difficulty)) {
+    return "Task difficulty must stay set to low, medium, or high.";
+  }
+
+  if (typeof draft.required !== "boolean") {
+    return "Task required must stay set to required or flexible.";
+  }
+
+  return null;
+}
+
+export function buildTaskEditPayload(draft) {
+  return {
+    title: draft.title.trim(),
+    est_minutes: Number.parseInt(String(draft.estMinutes).trim(), 10),
+    difficulty: draft.difficulty,
+    required: draft.required
+  };
+}
+
+export function getTaskPreservationIndicator(task) {
+  if (!task?.manual_lock) {
+    return null;
+  }
+
+  if (task.source === "manual") {
+    return {
+      label: "Edited",
+      tone: "edited",
+      copy: "Preserved during future adaptation."
+    };
+  }
+
+  return {
+    label: "Locked",
+    tone: "locked",
+    copy: "Preserved during future adaptation."
+  };
+}
+
 export function createEmptySnapshot() {
   return {
     user: null,

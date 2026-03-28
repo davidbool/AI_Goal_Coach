@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 
 import { parseApiResponse } from "../src/contracts/schemas.js";
 import { createServer } from "../src/server/createServer.js";
-import { bootstrapDemoSession, fetchAppBootstrap } from "../mobile/src/api/goalCoachApi.js";
+import {
+  bootstrapDemoSession,
+  editTask,
+  fetchAppBootstrap,
+  triggerFullAdaptation
+} from "../mobile/src/api/goalCoachApi.js";
 import { startServer } from "./helpers/httpTestClient.js";
 
 test("mobile API client fetches the initial bootstrap snapshot for an active goal", async (t) => {
@@ -78,4 +83,54 @@ test("mobile API client exposes effective notifications even before a preference
     max_push_per_day: 2,
     has_push_token: false
   });
+});
+
+test("mobile API client edits pending tasks and refreshes into the next adapted plan version", async (t) => {
+  const now = new Date("2026-03-28T09:00:00.000Z");
+  const { server } = createServer({ nowProvider: () => now, authMode: "required" });
+  const client = await startServer(server, { authUserId: "mobile-ui-user-4" });
+
+  t.after(async () => {
+    await client.stop();
+  });
+
+  await bootstrapDemoSession(client.baseUrl, "mobile-ui-user-4", "active_goal_ready");
+
+  const bootstrap = await fetchAppBootstrap(client.baseUrl, "mobile-ui-user-4");
+  parseApiResponse("app_bootstrap", bootstrap);
+
+  const pendingTask = bootstrap.today.tasks.find((task) => task.state === "pending");
+  assert.ok(pendingTask);
+
+  const edited = await editTask(client.baseUrl, "mobile-ui-user-4", pendingTask.id, {
+    title: "Trim the mobile dashboard gap",
+    est_minutes: 25,
+    difficulty: "high",
+    required: false
+  });
+  parseApiResponse("edit_task", edited);
+
+  assert.equal(edited.task.title, "Trim the mobile dashboard gap");
+  assert.equal(edited.task.est_minutes, 25);
+  assert.equal(edited.task.difficulty, "high");
+  assert.equal(edited.task.required, false);
+  assert.equal(edited.task.manual_lock, true);
+  assert.equal(edited.task.source, "manual");
+
+  const adapted = await triggerFullAdaptation(client.baseUrl, "mobile-ui-user-4", {
+    triggered_by: "manual"
+  });
+  parseApiResponse("adapt_goal", adapted);
+
+  assert.equal(adapted.new_plan_version, 2);
+
+  const refreshed = await fetchAppBootstrap(client.baseUrl, "mobile-ui-user-4");
+  parseApiResponse("app_bootstrap", refreshed);
+
+  assert.equal(refreshed.progress.plan_version, 2);
+  const preservedTask = refreshed.today.tasks.find((task) => task.title === "Trim the mobile dashboard gap");
+
+  assert.ok(preservedTask);
+  assert.equal(preservedTask.manual_lock, true);
+  assert.equal(preservedTask.source, "manual");
 });
