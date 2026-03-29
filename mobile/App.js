@@ -69,6 +69,7 @@ export default function App() {
   const [taskEditDraft, setTaskEditDraft] = useState(createEmptyTaskEditDraft());
   const [composer, setComposer] = useState(createEmptyComposer());
   const [generationScenario, setGenerationScenario] = useState("ready");
+  const [dashboardSurface, setDashboardSurface] = useState("today");
   const [devLabOpen, setDevLabOpen] = useState(false);
   const notificationDirtyRef = useRef(false);
 
@@ -183,6 +184,7 @@ export default function App() {
       );
 
       setDevSessionInfo(seededSession);
+      setDashboardSurface("today");
       setCoachMessage("Your local guest workspace is ready. Let's define one goal worth acting on.");
       resetComposer("");
       await loadSnapshot(nextSession, { rehydrateNotifications: true });
@@ -223,6 +225,7 @@ export default function App() {
             setDevSessionInfo(null);
             setSnapshot(createEmptySnapshot());
             setGenerationScenario("ready");
+            setDashboardSurface("today");
             resetComposer("");
             syncNotificationDraft();
             resetTaskEditing();
@@ -247,6 +250,7 @@ export default function App() {
           : await bootstrapDemoSession(session.apiBaseUrl, session.userId, scenario);
 
       setDevSessionInfo(payload);
+      setDashboardSurface("today");
       setCoachMessage(`Loaded "${payload.scenario.replace(/_/g, " ")}" so we can design against a stable state.`);
       resetTaskEditing();
       resetComposer("");
@@ -284,6 +288,7 @@ export default function App() {
   function handleStartNewGoal() {
     setCoachMessage("");
     setErrorMessage("");
+    setDashboardSurface("today");
     resetTaskEditing();
     setComposer((current) => ({
       ...createEmptyComposer(),
@@ -295,6 +300,7 @@ export default function App() {
   function handleCancelComposer() {
     setCoachMessage("No rush. We can come back to this goal whenever you want.");
     setErrorMessage("");
+    setDashboardSurface("today");
     resetComposer("");
   }
 
@@ -566,6 +572,7 @@ export default function App() {
     await runBusyAction("Activating this goal", async () => {
       await activateGoal(session.apiBaseUrl, session.userId, goalId);
       await loadSnapshot(session);
+      setDashboardSurface("today");
       resetTaskEditing();
       setCoachMessage("Your focus has been switched. Today's dashboard is refreshed for the active goal.");
       resetComposer("");
@@ -581,6 +588,29 @@ export default function App() {
       await completeTask(session.apiBaseUrl, session.userId, taskId, {});
       await loadSnapshot(session);
       setCoachMessage(`Nice work. "${taskTitle}" is complete and the dashboard is back in sync.`);
+    });
+  }
+
+  async function handleCompleteToday() {
+    if (!session) {
+      return;
+    }
+
+    const pendingTasks = (snapshot.today?.tasks ?? []).filter((task) => task.state === "pending");
+
+    if (pendingTasks.length === 0) {
+      setCoachMessage("Today is already wrapped. You can review progress whenever you want.");
+      return;
+    }
+
+    await runBusyAction("Completing today", async () => {
+      for (const task of pendingTasks) {
+        await completeTask(session.apiBaseUrl, session.userId, task.id, {});
+      }
+
+      await loadSnapshot(session);
+      resetTaskEditing();
+      setCoachMessage("Beautiful. Today's remaining tasks are complete and your momentum is updated.");
     });
   }
 
@@ -667,6 +697,14 @@ export default function App() {
     });
   }
 
+  function handleShowToday() {
+    setDashboardSurface("today");
+  }
+
+  function handleShowProgress() {
+    setDashboardSurface("progress");
+  }
+
   const isBusy = busyLabel.length > 0;
   const commonDevLabProps = {
     apiBaseUrl: apiBaseUrlDraft,
@@ -717,6 +755,7 @@ export default function App() {
         >
           <FlowRouter
             composer={composer}
+            dashboardSurface={dashboardSurface}
             editingTaskId={editingTaskId}
             notificationDirty={notificationDirty}
             notificationDraft={notificationDraft}
@@ -735,6 +774,7 @@ export default function App() {
             onClarificationChange={handleClarificationChange}
             onBeginTaskEdit={handleStartTaskEditing}
             onCompleteTask={handleCompleteTask}
+            onCompleteToday={handleCompleteToday}
             onConfirmMilestone={handleConfirmMilestone}
             onCreateAnotherGoal={handleStartNewGoal}
             onCreateGoal={handleCreateGoal}
@@ -745,6 +785,8 @@ export default function App() {
             onSaveTaskEdit={handleSaveTaskEditing}
             onSelectGoalPrompt={handleSelectGoalPrompt}
             onSelectNotificationMaxPush={handleSelectNotificationMaxPush}
+            onShowProgress={handleShowProgress}
+            onShowToday={handleShowToday}
             onSkipTask={handleSkipTask}
             onSoftAdjust={handleSoftAdjust}
             onSubmitClarifications={handleSubmitClarifications}

@@ -14,9 +14,9 @@ export function AssessmentScreen({ composer, isBusy, onBuildPlan, onCancel, onCh
   return (
     <>
       <HeroPanel
-        eyebrow="Step 3"
-        title="Calibrate the pace to your real life."
-        copy="This is where the app stops pretending your ideal week is your actual week. Set a pace you can sustain."
+        eyebrow="Goal setup"
+        title="Set a pace that fits real life."
+        copy="This step keeps the plan grounded in the time and energy you can actually protect each week."
       >
         <View style={styles.heroStatRow}>
           <HeroBadge label="Goal" value="Specific" />
@@ -28,7 +28,7 @@ export function AssessmentScreen({ composer, isBusy, onBuildPlan, onCancel, onCh
         <StepRail currentStep={3} />
         <Text style={styles.sectionTitle}>Assessment</Text>
         <Text style={styles.mutedCopy}>
-          We use this to set milestones, estimate the timeline, and shape your first tasks.
+          We use this to estimate the timeline, define milestones, and keep the first week realistic.
         </Text>
 
         <Text style={styles.fieldLabel}>Current level</Text>
@@ -50,7 +50,7 @@ export function AssessmentScreen({ composer, isBusy, onBuildPlan, onCancel, onCh
             keyboardType="number-pad"
             onChangeText={(value) => onChangeAssessment("weeklyMinutesAvailable", value)}
             placeholder="180"
-            placeholderTextColor="#8B7E73"
+            placeholderTextColor="#8A95A7"
             style={styles.input}
             value={composer.assessment.weeklyMinutesAvailable}
           />
@@ -62,26 +62,26 @@ export function AssessmentScreen({ composer, isBusy, onBuildPlan, onCancel, onCh
             autoCapitalize="none"
             onChangeText={(value) => onChangeAssessment("targetDate", value)}
             placeholder="YYYY-MM-DD"
-            placeholderTextColor="#8B7E73"
+            placeholderTextColor="#8A95A7"
             style={styles.input}
             value={composer.assessment.targetDate}
           />
         </View>
 
         <View style={styles.noteCard}>
-          <Text style={styles.noteTitle}>Good to know</Text>
+          <Text style={styles.noteTitle}>Why this matters</Text>
           <Text style={styles.noteCopy}>
-            The coach can soften today or adapt a future plan later. Right now we only need an honest starting point.
+            The coach can always adjust later. Right now we only need an honest starting point that feels sustainable.
           </Text>
         </View>
 
         <ActionButton
           disabled={isBusy}
-          label="Build my first plan"
+          label="Build my plan"
           onPress={onBuildPlan}
           tone="primary"
         />
-        <ActionButton disabled={isBusy} label="Pause this draft" onPress={onCancel} tone="ghost" />
+        <ActionButton disabled={isBusy} label="Pause draft" onPress={onCancel} tone="ghost" />
       </View>
     </>
   );

@@ -1,20 +1,26 @@
 import { Text, TextInput, View } from "react-native";
 
-import { ActionButton, HeroBadge, HeroPanel, StepRail } from "../components/Primitives.js";
+import {
+  ActionButton,
+  ChatBubble,
+  HeroBadge,
+  HeroPanel,
+  StepRail
+} from "../components/Primitives.js";
 import { styles } from "../../../ui/styles.js";
 
 export function ClarificationScreen({ composer, isBusy, onCancel, onChangeAnswer, onSubmit }) {
   return (
     <>
       <HeroPanel
-        eyebrow="Step 2"
-        title="Let's make the goal concrete."
-        copy="We do not want a fake-precise plan. These short prompts make sure the app understands what success actually looks like."
+        eyebrow="Onboarding chat"
+        title="A few details will make this plan stronger."
+        copy="Short, honest answers are enough. The goal is clarity, not perfection."
       >
         <View style={styles.heroStatRow}>
           <HeroBadge label="Goal" value="Clarify" />
           <HeroBadge
-            label="Score"
+            label="Specificity"
             value={composer.specificity ? `${Math.round(composer.specificity.score * 100)}%` : "Draft"}
           />
         </View>
@@ -23,27 +29,27 @@ export function ClarificationScreen({ composer, isBusy, onCancel, onChangeAnswer
       <View style={styles.card}>
         <StepRail currentStep={2} />
         <Text style={styles.sectionTitle}>{composer.title}</Text>
-        <Text style={styles.mutedCopy}>
-          Answer in your own words. Short, honest answers are better than aspirational ones.
-        </Text>
-        {composer.clarificationFields.map((field, index) => (
-          <View key={field.id} style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Prompt {index + 1}</Text>
-            <Text style={styles.promptText}>{field.questionText}</Text>
-            <TextInput
-              autoCapitalize="sentences"
-              multiline
-              onChangeText={(value) => onChangeAnswer(field.id, value)}
-              placeholder="Write your answer here"
-              placeholderTextColor="#8B7E73"
-              style={[styles.input, styles.multilineInput]}
-              textAlignVertical="top"
-              value={field.answerText}
-            />
-          </View>
-        ))}
+        <View style={styles.chatThread}>
+          <ChatBubble text="I'm close to having enough context. Answer these and I'll shape the plan around your real situation." />
+          {composer.clarificationFields.map((field, index) => (
+            <View key={field.id} style={styles.chatQuestionBlock}>
+              <Text style={styles.fieldLabel}>Prompt {index + 1}</Text>
+              <ChatBubble text={field.questionText} />
+              <TextInput
+                autoCapitalize="sentences"
+                multiline
+                onChangeText={(value) => onChangeAnswer(field.id, value)}
+                placeholder="Type your answer"
+                placeholderTextColor="#8A95A7"
+                style={[styles.input, styles.chatReplyInput, styles.multilineInput]}
+                textAlignVertical="top"
+                value={field.answerText}
+              />
+            </View>
+          ))}
+        </View>
         <ActionButton disabled={isBusy} label="Continue" onPress={onSubmit} tone="primary" />
-        <ActionButton disabled={isBusy} label="Pause this draft" onPress={onCancel} tone="ghost" />
+        <ActionButton disabled={isBusy} label="Pause draft" onPress={onCancel} tone="ghost" />
       </View>
     </>
   );

@@ -2,7 +2,7 @@ import { Platform, StyleSheet } from "react-native";
 
 const headingFont = Platform.select({
   ios: "Avenir Next",
-  android: "sans-serif-condensed",
+  android: "sans-serif-medium",
   default: undefined
 });
 
@@ -12,60 +12,95 @@ const bodyFont = Platform.select({
   default: undefined
 });
 
-const accentFont = Platform.select({
-  ios: "Georgia",
-  android: "serif",
-  default: undefined
-});
+const palette = {
+  primary: "#5B7CFA",
+  primarySoft: "#EEF3FF",
+  background: "#F8FAFC",
+  card: "#FFFFFF",
+  text: "#162033",
+  muted: "#5F6C82",
+  subtle: "#8A95A7",
+  border: "#E2E8F0",
+  borderStrong: "#CFD8E3",
+  success: "#22C55E",
+  successSoft: "#E9F9EF",
+  warning: "#F59E0B",
+  warningSoft: "#FFF6E3",
+  danger: "#EF4444",
+  dangerSoft: "#FEEDEE",
+  bubbleAssistant: "#EEF3FF",
+  bubbleUser: "#FFFFFF",
+  shadow: "#A8B6D8"
+};
 
 export const toneStyles = {
-  neutral: { backgroundColor: "#F2E8D9", borderColor: "#E6D7BE" },
-  pending: { backgroundColor: "#F2E8D9", borderColor: "#E6D7BE" },
-  completed: { backgroundColor: "#D9F0E2", borderColor: "#B4D7C4" },
-  skipped: { backgroundColor: "#F7E3DB", borderColor: "#E5C3B4" },
-  edited: { backgroundColor: "#DCEBE7", borderColor: "#BFD8D1" },
-  locked: { backgroundColor: "#E7ECF1", borderColor: "#CBD6E0" },
-  low: { backgroundColor: "#DCEEDB", borderColor: "#BDD8BC" },
-  medium: { backgroundColor: "#F5E4BC", borderColor: "#E7CC85" },
-  high: { backgroundColor: "#F7D7C9", borderColor: "#E7B7A4" },
-  generating: { backgroundColor: "#E9E3F7", borderColor: "#CEC2E8" },
-  delayed: { backgroundColor: "#FDE6C9", borderColor: "#F1C98A" },
-  ready: { backgroundColor: "#D9F0E2", borderColor: "#B4D7C4" },
-  failed: { backgroundColor: "#F7D7D0", borderColor: "#E7AEA3" },
-  required: { backgroundColor: "#E2EEF8", borderColor: "#BED5EA" }
+  neutral: { backgroundColor: "#F1F5F9", borderColor: palette.border },
+  pending: { backgroundColor: "#F1F5F9", borderColor: palette.border },
+  completed: { backgroundColor: palette.successSoft, borderColor: "#BCE9CC" },
+  skipped: { backgroundColor: palette.warningSoft, borderColor: "#F7DFA7" },
+  edited: { backgroundColor: palette.primarySoft, borderColor: "#D3DEFF" },
+  locked: { backgroundColor: "#EEF2FF", borderColor: "#D8E0FF" },
+  low: { backgroundColor: "#EEF8F1", borderColor: "#CBECD6" },
+  medium: { backgroundColor: "#FFF7E6", borderColor: "#F4DFAC" },
+  high: { backgroundColor: "#FFF0EE", borderColor: "#F7CCC6" },
+  generating: { backgroundColor: "#EEF3FF", borderColor: "#D4E0FF" },
+  delayed: { backgroundColor: "#FFF6E3", borderColor: "#F4D8A0" },
+  ready: { backgroundColor: palette.successSoft, borderColor: "#BCE9CC" },
+  failed: { backgroundColor: palette.dangerSoft, borderColor: "#F6C8CC" },
+  required: { backgroundColor: "#EEF3FF", borderColor: "#D3DEFF" }
 };
 
 export const toneTextStyles = {
-  neutral: { color: "#5F5349" },
-  pending: { color: "#5F5349" },
-  completed: { color: "#2D6950" },
-  skipped: { color: "#8A4E38" },
-  edited: { color: "#315D55" },
-  locked: { color: "#4D6170" },
-  low: { color: "#35684A" },
-  medium: { color: "#7A5A11" },
-  high: { color: "#8C4727" },
-  generating: { color: "#5D4A84" },
-  delayed: { color: "#925E00" },
-  ready: { color: "#2D6950" },
-  failed: { color: "#8B3E31" },
-  required: { color: "#355C7A" }
+  neutral: { color: palette.muted },
+  pending: { color: palette.muted },
+  completed: { color: "#1D7A44" },
+  skipped: { color: "#A15C00" },
+  edited: { color: "#4164D3" },
+  locked: { color: "#5266A8" },
+  low: { color: "#237046" },
+  medium: { color: "#9A6700" },
+  high: { color: "#BB4B3A" },
+  generating: { color: "#4664C9" },
+  delayed: { color: "#B46A00" },
+  ready: { color: "#1D7A44" },
+  failed: { color: "#C2414F" },
+  required: { color: "#4164D3" }
 };
 
 export const toneButtonStyles = {
-  primary: { backgroundColor: "#B65C3A" },
-  secondary: { backgroundColor: "#F1E4D1" },
-  ghost: { backgroundColor: "#FFF8EE", borderWidth: 1, borderColor: "#E9DCC9" },
-  danger: { backgroundColor: "#8F3E2B" },
-  muted: { backgroundColor: "#E9E0D6" }
+  primary: { backgroundColor: palette.primary },
+  secondary: {
+    backgroundColor: palette.primarySoft,
+    borderWidth: 1,
+    borderColor: "#D9E3FF"
+  },
+  ghost: {
+    backgroundColor: palette.card,
+    borderWidth: 1,
+    borderColor: palette.border
+  },
+  danger: { backgroundColor: palette.danger },
+  muted: {
+    backgroundColor: "#EDF2F7",
+    borderWidth: 1,
+    borderColor: palette.border
+  }
 };
 
 export const toneButtonTextStyles = {
-  primary: { color: "#FFF7EE" },
-  secondary: { color: "#3F342C" },
-  ghost: { color: "#7E5A47" },
-  danger: { color: "#FFF7EE" },
-  muted: { color: "#8A7D70" }
+  primary: { color: "#FFFFFF" },
+  secondary: { color: palette.primary },
+  ghost: { color: palette.text },
+  danger: { color: "#FFFFFF" },
+  muted: { color: palette.subtle }
+};
+
+const cardShadow = {
+  shadowColor: palette.shadow,
+  shadowOpacity: 0.14,
+  shadowRadius: 24,
+  shadowOffset: { width: 0, height: 12 },
+  elevation: 5
 };
 
 export const styles = StyleSheet.create({
@@ -74,170 +109,230 @@ export const styles = StyleSheet.create({
   },
   screen: {
     flex: 1,
-    backgroundColor: "#FFF7EE"
+    backgroundColor: palette.background
   },
   backgroundWrap: {
     ...StyleSheet.absoluteFillObject
   },
   backgroundBlobTop: {
     position: "absolute",
-    top: -120,
-    right: -40,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: "#F1C37B"
+    top: -150,
+    right: -50,
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    backgroundColor: "rgba(91,124,250,0.14)"
   },
   backgroundBlobLeft: {
     position: "absolute",
     top: 220,
-    left: -110,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-    backgroundColor: "#B8DCC9"
-  },
-  backgroundBlobBottom: {
-    position: "absolute",
-    bottom: -110,
-    right: -70,
+    left: -130,
     width: 260,
     height: 260,
     borderRadius: 130,
-    backgroundColor: "#EFC4B0"
+    backgroundColor: "rgba(125,211,252,0.16)"
+  },
+  backgroundBlobBottom: {
+    position: "absolute",
+    bottom: -120,
+    right: -80,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: "rgba(191,219,254,0.22)"
   },
   backgroundHalo: {
     position: "absolute",
     top: 80,
     left: 28,
     right: 28,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: "rgba(255,255,255,0.45)"
+    height: 220,
+    borderRadius: 36,
+    backgroundColor: "rgba(255,255,255,0.55)"
   },
   loadingWrap: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 28,
+    paddingHorizontal: 32,
     gap: 12
   },
   loadingTitle: {
-    color: "#332C27",
+    color: palette.text,
     fontFamily: headingFont,
-    fontSize: 28,
+    fontSize: 30,
+    lineHeight: 36,
     fontWeight: "700",
     textAlign: "center"
   },
   loadingCopy: {
-    color: "#675C54",
+    color: palette.muted,
+    fontFamily: bodyFont,
     fontSize: 15,
-    lineHeight: 22,
-    textAlign: "center",
-    fontFamily: bodyFont
+    lineHeight: 23,
+    textAlign: "center"
   },
   welcomeContent: {
     paddingHorizontal: 20,
-    paddingTop: 22,
+    paddingTop: 24,
     paddingBottom: 34,
-    gap: 18,
+    gap: 16,
     minHeight: "100%",
     justifyContent: "center"
   },
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 18,
-    paddingBottom: 36,
-    gap: 18
+    paddingBottom: 42,
+    gap: 16
   },
   heroCard: {
-    backgroundColor: "#26201D",
-    borderRadius: 32,
+    ...cardShadow,
+    backgroundColor: palette.card,
+    borderRadius: 30,
     padding: 24,
     gap: 10,
-    shadowColor: "#1A1613",
-    shadowOpacity: 0.14,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 14 },
-    elevation: 6
+    borderWidth: 1,
+    borderColor: "rgba(91,124,250,0.08)"
   },
   eyebrow: {
-    color: "#F1C37B",
-    fontFamily: accentFont,
+    color: palette.primary,
+    fontFamily: bodyFont,
     fontSize: 12,
+    fontWeight: "700",
     textTransform: "uppercase",
-    letterSpacing: 2
+    letterSpacing: 1.4
   },
   heroTitle: {
-    color: "#FFF7EE",
+    color: palette.text,
     fontFamily: headingFont,
-    fontSize: 32,
-    lineHeight: 38,
+    fontSize: 30,
+    lineHeight: 36,
     fontWeight: "700"
   },
   heroCopy: {
-    color: "#E8DDD2",
+    color: palette.muted,
     fontFamily: bodyFont,
     fontSize: 15,
-    lineHeight: 23
+    lineHeight: 24
   },
   heroStatRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
-    marginTop: 6
+    marginTop: 8
   },
   heroBadge: {
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: "rgba(255,247,238,0.12)",
+    backgroundColor: palette.primarySoft,
     borderWidth: 1,
-    borderColor: "rgba(255,247,238,0.12)"
+    borderColor: "#D7E2FF"
   },
   heroBadgeLabel: {
-    color: "#D8C6B7",
+    color: palette.subtle,
+    fontFamily: bodyFont,
     fontSize: 10,
     textTransform: "uppercase",
-    letterSpacing: 1.2,
-    fontFamily: bodyFont
+    letterSpacing: 0.9
   },
   heroBadgeValue: {
-    color: "#FFF7EE",
+    color: palette.text,
+    fontFamily: bodyFont,
     fontSize: 14,
+    lineHeight: 18,
     fontWeight: "700",
-    marginTop: 2,
-    fontFamily: bodyFont
+    marginTop: 3
   },
   card: {
-    backgroundColor: "rgba(255, 252, 247, 0.9)",
-    borderRadius: 28,
+    ...cardShadow,
+    backgroundColor: palette.card,
+    borderRadius: 26,
     padding: 20,
     gap: 14,
     borderWidth: 1,
-    borderColor: "rgba(77, 60, 49, 0.08)"
+    borderColor: "rgba(226,232,240,0.9)"
   },
   sectionHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    gap: 14
+    gap: 12
   },
   sectionHeaderCopy: {
     flex: 1,
     gap: 4
   },
   sectionTitle: {
-    color: "#332C27",
+    color: palette.text,
     fontFamily: headingFont,
     fontSize: 24,
+    lineHeight: 29,
     fontWeight: "700"
   },
   mutedCopy: {
-    color: "#6C6057",
+    color: palette.muted,
     fontFamily: bodyFont,
     fontSize: 14,
     lineHeight: 22
+  },
+  pageEyebrow: {
+    color: palette.primary,
+    fontFamily: bodyFont,
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 1.2
+  },
+  pageTitle: {
+    color: palette.text,
+    fontFamily: headingFont,
+    fontSize: 32,
+    lineHeight: 38,
+    fontWeight: "700"
+  },
+  pageSubtitle: {
+    color: palette.muted,
+    fontFamily: bodyFont,
+    fontSize: 15,
+    lineHeight: 23
+  },
+  greetingWrap: {
+    gap: 6,
+    paddingTop: 6
+  },
+  segmentedControl: {
+    flexDirection: "row",
+    padding: 4,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.74)",
+    borderWidth: 1,
+    borderColor: "rgba(226,232,240,0.95)"
+  },
+  segmentedItem: {
+    flex: 1,
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    paddingHorizontal: 12
+  },
+  segmentedItemActive: {
+    backgroundColor: palette.card,
+    ...cardShadow,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2
+  },
+  segmentedLabel: {
+    color: palette.subtle,
+    fontFamily: bodyFont,
+    fontSize: 14,
+    fontWeight: "700"
+  },
+  segmentedLabelActive: {
+    color: palette.text
   },
   fieldGroup: {
     gap: 8
@@ -251,61 +346,65 @@ export const styles = StyleSheet.create({
     gap: 8
   },
   fieldLabel: {
-    color: "#554941",
+    color: palette.subtle,
     fontFamily: bodyFont,
     fontSize: 12,
     fontWeight: "700",
-    letterSpacing: 0.6,
+    letterSpacing: 0.7,
     textTransform: "uppercase"
   },
   promptText: {
-    color: "#332C27",
+    color: palette.text,
     fontFamily: bodyFont,
     fontSize: 15,
-    lineHeight: 22
+    lineHeight: 23
   },
   helperLine: {
-    color: "#7D6F66",
+    color: palette.subtle,
     fontFamily: bodyFont,
     fontSize: 13,
     lineHeight: 20
   },
   input: {
-    minHeight: 52,
+    minHeight: 54,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#E7D8C5",
-    backgroundColor: "#FFF8F1",
+    borderColor: palette.border,
+    backgroundColor: "#F9FBFF",
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: "#332C27",
+    color: palette.text,
     fontFamily: bodyFont,
     fontSize: 15
   },
   multilineInput: {
-    minHeight: 126
+    minHeight: 118
   },
   noteCard: {
-    backgroundColor: "#F8EBDD",
+    backgroundColor: "#F8FBFF",
     borderRadius: 20,
-    padding: 14,
-    gap: 6
+    padding: 16,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: palette.border
   },
   noteTitle: {
-    color: "#5E4736",
-    fontFamily: accentFont,
-    fontSize: 14
-  },
-  noteCopy: {
-    color: "#6B5649",
+    color: palette.text,
     fontFamily: bodyFont,
     fontSize: 13,
-    lineHeight: 20
+    fontWeight: "700",
+    letterSpacing: 0.3
+  },
+  noteCopy: {
+    color: palette.muted,
+    fontFamily: bodyFont,
+    fontSize: 14,
+    lineHeight: 21
   },
   stepRail: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 4
+    marginBottom: 2
   },
   stepRailItem: {
     flexDirection: "row",
@@ -313,36 +412,36 @@ export const styles = StyleSheet.create({
     flex: 1
   },
   stepRailDot: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F4E8DA",
+    backgroundColor: "#F1F5F9",
     borderWidth: 1,
-    borderColor: "#E4D6C5"
+    borderColor: palette.border
   },
   stepRailDotActive: {
-    backgroundColor: "#B65C3A",
-    borderColor: "#B65C3A"
+    backgroundColor: palette.primary,
+    borderColor: palette.primary
   },
   stepRailDotText: {
-    color: "#6D5D52",
+    color: palette.subtle,
     fontFamily: bodyFont,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "700"
   },
   stepRailDotTextActive: {
-    color: "#FFF7EE"
+    color: "#FFFFFF"
   },
   stepRailLine: {
     flex: 1,
     height: 2,
-    backgroundColor: "#E6D7C4",
+    backgroundColor: "#DFE7F1",
     marginHorizontal: 8
   },
   stepRailLineActive: {
-    backgroundColor: "#D58A66"
+    backgroundColor: palette.primary
   },
   pillWrap: {
     flexDirection: "row",
@@ -354,28 +453,28 @@ export const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 11,
-    backgroundColor: "#F6EFE6",
+    backgroundColor: "#F8FBFF",
     borderWidth: 1,
-    borderColor: "#E8DBCC"
+    borderColor: palette.border
   },
   choicePillActive: {
-    backgroundColor: "#26201D",
-    borderColor: "#26201D"
+    backgroundColor: palette.primary,
+    borderColor: palette.primary
   },
   choicePillDisabled: {
     opacity: 0.55
   },
   choicePillText: {
-    color: "#4A3F38",
+    color: palette.text,
     fontFamily: bodyFont,
     fontSize: 14,
     fontWeight: "700"
   },
   choicePillTextActive: {
-    color: "#FFF7EE"
+    color: "#FFFFFF"
   },
   buttonBase: {
-    minHeight: 48,
+    minHeight: 50,
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
@@ -386,7 +485,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 14
   },
   buttonPressed: {
-    opacity: 0.86,
+    opacity: 0.9,
     transform: [{ scale: 0.99 }]
   },
   buttonDisabled: {
@@ -398,7 +497,7 @@ export const styles = StyleSheet.create({
     fontWeight: "700"
   },
   buttonTextDisabled: {
-    color: "#8C7E71"
+    color: palette.subtle
   },
   metricGrid: {
     flexDirection: "row",
@@ -411,19 +510,19 @@ export const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    backgroundColor: "#FFF5E9",
+    backgroundColor: "#F8FBFF",
     borderWidth: 1,
-    borderColor: "#EADBC8"
+    borderColor: palette.border
   },
   metricTileLabel: {
-    color: "#7B6C61",
+    color: palette.subtle,
     fontFamily: bodyFont,
     fontSize: 11,
-    letterSpacing: 0.9,
+    letterSpacing: 0.8,
     textTransform: "uppercase"
   },
   metricTileValue: {
-    color: "#332C27",
+    color: palette.text,
     fontFamily: headingFont,
     fontSize: 18,
     lineHeight: 22,
@@ -446,43 +545,181 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingVertical: 4
+    paddingVertical: 6
   },
   listRowCopy: {
     flex: 1,
     gap: 3
   },
   listPrimary: {
-    color: "#332C27",
+    color: palette.text,
     fontFamily: bodyFont,
     fontSize: 15,
+    lineHeight: 21,
     fontWeight: "700"
   },
   listSecondary: {
-    color: "#6D6057",
+    color: palette.muted,
     fontFamily: bodyFont,
     fontSize: 13,
     lineHeight: 19
   },
   listTertiary: {
-    color: "#7D7067",
+    color: palette.subtle,
     fontFamily: bodyFont,
     fontSize: 12,
     lineHeight: 18
   },
   emptyLine: {
-    color: "#6D6057",
+    color: palette.muted,
     fontFamily: bodyFont,
     fontSize: 14,
     lineHeight: 22
+  },
+  goalCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12
+  },
+  goalCardTitle: {
+    flex: 1,
+    color: palette.text,
+    fontFamily: headingFont,
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: "700"
+  },
+  goalCardMeta: {
+    color: palette.muted,
+    fontFamily: bodyFont,
+    fontSize: 14,
+    lineHeight: 21
+  },
+  statPill: {
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: palette.primarySoft,
+    borderWidth: 1,
+    borderColor: "#D8E2FF"
+  },
+  statPillText: {
+    color: palette.primary,
+    fontFamily: bodyFont,
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  progressSummaryRow: {
+    flexDirection: "row",
+    gap: 12
+  },
+  progressStat: {
+    flex: 1,
+    borderRadius: 20,
+    backgroundColor: "#F8FBFF",
+    borderWidth: 1,
+    borderColor: palette.border,
+    padding: 14,
+    gap: 4
+  },
+  progressStatLabel: {
+    color: palette.subtle,
+    fontFamily: bodyFont,
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.8
+  },
+  progressStatValue: {
+    color: palette.text,
+    fontFamily: headingFont,
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: "700"
+  },
+  taskList: {
+    gap: 12
+  },
+  taskItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 14,
+    padding: 16,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: "#F9FBFF"
+  },
+  taskItemDone: {
+    backgroundColor: "#F6FBF7"
+  },
+  taskCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#C7D2E5",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+    backgroundColor: palette.card
+  },
+  taskCheckboxDone: {
+    backgroundColor: palette.primary,
+    borderColor: palette.primary
+  },
+  taskCheckboxGlyph: {
+    color: "transparent",
+    fontFamily: bodyFont,
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  taskCheckboxGlyphDone: {
+    color: "#FFFFFF"
+  },
+  taskItemContent: {
+    flex: 1,
+    gap: 6
+  },
+  taskItemTitle: {
+    color: palette.text,
+    fontFamily: bodyFont,
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: "700"
+  },
+  taskItemTitleDone: {
+    color: palette.muted,
+    textDecorationLine: "line-through"
+  },
+  taskItemMeta: {
+    color: palette.muted,
+    fontFamily: bodyFont,
+    fontSize: 13,
+    lineHeight: 19
+  },
+  taskItemActionRow: {
+    flexDirection: "row",
+    gap: 16,
+    paddingTop: 2
+  },
+  textLink: {
+    color: palette.primary,
+    fontFamily: bodyFont,
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  textLinkDanger: {
+    color: palette.warning
   },
   taskCard: {
     borderRadius: 24,
     padding: 16,
     gap: 12,
-    backgroundColor: "#FFF9F2",
+    backgroundColor: "#F9FBFF",
     borderWidth: 1,
-    borderColor: "#EBDCC9"
+    borderColor: palette.border
   },
   taskCardHeader: {
     flexDirection: "row",
@@ -498,11 +735,11 @@ export const styles = StyleSheet.create({
   },
   taskTitle: {
     flex: 1,
-    color: "#332C27",
+    color: palette.text,
     fontFamily: bodyFont,
     fontSize: 16,
-    fontWeight: "700",
-    lineHeight: 22
+    lineHeight: 22,
+    fontWeight: "700"
   },
   taskMetaRow: {
     flexDirection: "row",
@@ -533,12 +770,14 @@ export const styles = StyleSheet.create({
     width: 48,
     minHeight: 48,
     borderRadius: 16,
-    backgroundColor: "#F8EBDD",
+    backgroundColor: palette.primarySoft,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#D8E2FF"
   },
   previewWeekText: {
-    color: "#7A5B47",
+    color: palette.primary,
     fontFamily: headingFont,
     fontSize: 14,
     fontWeight: "700"
@@ -548,40 +787,40 @@ export const styles = StyleSheet.create({
     gap: 4
   },
   progressBarTrack: {
-    height: 12,
+    height: 10,
     borderRadius: 999,
-    backgroundColor: "#F2E5D7",
+    backgroundColor: "#E7EEF8",
     overflow: "hidden"
   },
   progressBarFill: {
     height: "100%",
     borderRadius: 999,
-    backgroundColor: "#B65C3A"
+    backgroundColor: palette.primary
   },
   coachBanner: {
-    backgroundColor: "#F8EBDD",
-    borderRadius: 20,
+    backgroundColor: palette.primarySoft,
+    borderRadius: 18,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: "#ECD7BE"
+    borderColor: "#D6E1FF"
   },
   coachBannerText: {
-    color: "#5D4B3E",
+    color: palette.primary,
     fontFamily: bodyFont,
     fontSize: 14,
     lineHeight: 20
   },
   errorBanner: {
-    backgroundColor: "#FCE2D9",
-    borderRadius: 20,
+    backgroundColor: palette.dangerSoft,
+    borderRadius: 18,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: "#EDC0B0"
+    borderColor: "#F4C9CE"
   },
   errorText: {
-    color: "#8A3D28",
+    color: "#C2414F",
     fontFamily: bodyFont,
     fontSize: 14,
     lineHeight: 20
@@ -594,9 +833,65 @@ export const styles = StyleSheet.create({
     paddingTop: 4
   },
   busyText: {
-    color: "#5D4B3E",
+    color: palette.primary,
     fontFamily: bodyFont,
     fontSize: 14,
     fontWeight: "700"
+  },
+  chatThread: {
+    gap: 12
+  },
+  chatQuestionBlock: {
+    gap: 10
+  },
+  chatMessageRow: {
+    flexDirection: "row",
+    justifyContent: "flex-start"
+  },
+  chatMessageRowUser: {
+    justifyContent: "flex-end"
+  },
+  chatBubble: {
+    maxWidth: "86%",
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1
+  },
+  chatBubbleAssistant: {
+    backgroundColor: palette.bubbleAssistant,
+    borderColor: "#D8E3FF"
+  },
+  chatBubbleUser: {
+    backgroundColor: palette.bubbleUser,
+    borderColor: palette.border
+  },
+  chatBubbleText: {
+    color: palette.text,
+    fontFamily: bodyFont,
+    fontSize: 15,
+    lineHeight: 22
+  },
+  chatBubbleTextUser: {
+    color: palette.text
+  },
+  chatComposer: {
+    gap: 10,
+    paddingTop: 4
+  },
+  chatInput: {
+    minHeight: 56,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: "#F9FBFF",
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+    color: palette.text,
+    fontFamily: bodyFont,
+    fontSize: 15
+  },
+  chatReplyInput: {
+    backgroundColor: palette.card
   }
 });
