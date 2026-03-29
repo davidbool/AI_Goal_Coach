@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createApp } from "../src/app.js";
 
 async function withServer(run) {
-  const { app, store } = createApp();
+  const { app, store } = createApp({ storeMode: "memory" });
   const server = app.listen(0);
 
   await new Promise((resolve) => server.once("listening", resolve));
@@ -328,7 +328,7 @@ test("Plan generation falls back to failed when AI returns an invalid payload", 
     }
   };
 
-  const { app } = createApp({ aiClient: invalidAiClient });
+  const { app } = createApp({ aiClient: invalidAiClient, storeMode: "memory" });
   const server = app.listen(0);
 
   await new Promise((resolve) => server.once("listening", resolve));

@@ -5,7 +5,7 @@ import { startServer } from "./helpers/httpTestClient.js";
 
 test("M4 + M5 contract routes respond with expected payloads", async (t) => {
   const now = new Date("2026-03-26T12:00:00.000Z");
-  const { server } = createServer({ nowProvider: () => now });
+  const { server } = createServer({ nowProvider: () => now, storeMode: "memory" });
   const client = await startServer(server);
 
   t.after(async () => {

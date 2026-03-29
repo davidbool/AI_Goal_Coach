@@ -7,7 +7,7 @@ import { startServer } from "./helpers/httpTestClient.js";
 
 test("dev bootstrap seeds a deterministic active-goal scenario and reset clears it", async (t) => {
   const now = new Date("2026-03-28T09:00:00.000Z");
-  const { server } = createServer({ nowProvider: () => now, authMode: "required" });
+  const { server } = createServer({ nowProvider: () => now, authMode: "required", storeMode: "memory" });
   const client = await startServer(server, { authUserId: "guest-demo-1" });
 
   t.after(async () => {
@@ -63,7 +63,7 @@ test("dev bootstrap seeds a deterministic active-goal scenario and reset clears 
 
 test("dev bootstrap supports no_active_goal and no_tasks_today UI states", async (t) => {
   const now = new Date("2026-03-28T09:00:00.000Z");
-  const { server } = createServer({ nowProvider: () => now, authMode: "required" });
+  const { server } = createServer({ nowProvider: () => now, authMode: "required", storeMode: "memory" });
   const client = await startServer(server, { authUserId: "guest-demo-2" });
 
   t.after(async () => {
