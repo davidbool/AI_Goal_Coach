@@ -6,13 +6,16 @@ import { syncPushTokenRegistrationCore } from "./pushTokenServiceCore.js";
 
 export async function syncPushTokenRegistration({
   apiBaseUrl,
+  authContext,
   userId,
   hasPushToken = false,
   promptForPermission = false
 }) {
+  const effectiveAuthContext = authContext ?? userId;
+
   return syncPushTokenRegistrationCore({
     apiBaseUrl,
-    userId,
+    authContext: effectiveAuthContext,
     hasPushToken,
     promptForPermission,
     deviceIsPhysical: Device.isDevice,
@@ -20,7 +23,7 @@ export async function syncPushTokenRegistration({
     requestPermissionsAsync: Notifications.requestPermissionsAsync,
     getDevicePushTokenAsync: Notifications.getDevicePushTokenAsync,
     registerNotificationToken: (token, platform) =>
-      registerNotificationTokenRequest(apiBaseUrl, userId, token, platform),
+      registerNotificationTokenRequest(apiBaseUrl, effectiveAuthContext, token, platform),
     provisionalStatus: Notifications.IosAuthorizationStatus.PROVISIONAL
   });
 }

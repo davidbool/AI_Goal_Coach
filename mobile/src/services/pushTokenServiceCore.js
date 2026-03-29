@@ -66,6 +66,7 @@ export function mapPushTokenRegistrationError(error) {
 
 export async function syncPushTokenRegistrationCore({
   apiBaseUrl,
+  authContext,
   userId,
   hasPushToken = false,
   promptForPermission = false,
@@ -80,8 +81,10 @@ export async function syncPushTokenRegistrationCore({
     throw new Error("API base URL is required");
   }
 
-  if (!userId) {
-    throw new Error("User ID is required");
+  const effectiveAuthContext = authContext ?? userId;
+
+  if (!effectiveAuthContext) {
+    throw new Error("Auth context is required");
   }
 
   if (hasPushToken) {

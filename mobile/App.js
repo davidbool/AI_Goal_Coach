@@ -21,12 +21,14 @@ import {
   submitClarifications
 } from "./src/api/goalCoachApi.js";
 import {
-  clearGuestSession,
+  clearAppSession,
+  createFirebaseSession,
   createGuestSession,
   DEFAULT_API_BASE_URL,
-  readGuestSession,
-  writeGuestSession
-} from "./src/storage/guestSession.js";
+  isFirebaseSession,
+  readAppSession,
+  writeAppSession
+} from "./src/storage/appSession.js";
 import { FlowRouter } from "./src/features/coachFlow/FlowRouter.js";
 import {
   buildNotificationPreferencesPayload,
@@ -46,6 +48,14 @@ import {
   validateTaskEditDraft
 } from "./src/features/coachFlow/model.js";
 import { syncPushTokenRegistration } from "./src/services/pushTokenService.js";
+import { isFirebaseConfigured } from "./src/services/firebaseApp.js";
+import {
+  getCurrentFirebaseIdToken,
+  registerWithEmailAndPassword,
+  signInWithEmailPassword,
+  signOutFromFirebase,
+  waitForFirebaseAuthRestore
+} from "./src/services/firebaseAuthService.js";
 import { DeveloperLab } from "./src/features/coachFlow/screens/DeveloperLab.js";
 import { WelcomeScreen } from "./src/features/coachFlow/screens/WelcomeScreen.js";
 import {
@@ -55,10 +65,20 @@ import {
 } from "./src/features/coachFlow/components/Primitives.js";
 import { styles } from "./src/ui/styles.js";
 
+function createEmptyAuthDraft() {
+  return {
+    email: "",
+    password: "",
+    confirmPassword: ""
+  };
+}
+
 export default function App() {
   const [hydrating, setHydrating] = useState(true);
   const [session, setSession] = useState(null);
   const [apiBaseUrlDraft, setApiBaseUrlDraft] = useState(DEFAULT_API_BASE_URL);
+  const [authMode, setAuthMode] = useState("sign_up");
+  const [authDraft, setAuthDraft] = useState(createEmptyAuthDraft());
   const [busyLabel, setBusyLabel] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [coachMessage, setCoachMessage] = useState("");
@@ -90,29 +110,95 @@ export default function App() {
     setTaskEditDraft(createEmptyTaskEditDraft());
   }
 
+  function getSessionAuth(activeSession = session) {
+    if (!activeSession) {
+      return null;
+    }
+
+    if (isFirebaseSession(activeSession)) {
+      return {
+        getAuthorizationValue: async () => getCurrentFirebaseIdToken()
+      };
+    }
+
+    return activeSession.userId;
+  }
+
+  function resetExperienceState(nextApiBaseUrl = DEFAULT_API_BASE_URL) {
+    setSession(null);
+    setApiBaseUrlDraft(nextApiBaseUrl);
+    setDevSessionInfo(null);
+    setSnapshot(createEmptySnapshot());
+    setGenerationScenario("ready");
+    setDashboardSurface("today");
+    resetComposer("");
+    syncNotificationDraft();
+    resetTaskEditing();
+    setAuthDraft(createEmptyAuthDraft());
+    setBusyLabel("");
+    setErrorMessage("");
+    setCoachMessage("");
+    setPushStatusMessage("");
+    setDevLabOpen(false);
+  }
+
   useEffect(() => {
     let cancelled = false;
 
     async function hydrate() {
       try {
-        const storedSession = await readGuestSession();
+        const storedSession = await readAppSession();
+        const resolvedApiBaseUrl = storedSession?.apiBaseUrl ?? DEFAULT_API_BASE_URL;
 
         if (cancelled) {
           return;
         }
 
-        if (!storedSession) {
-          setApiBaseUrlDraft(DEFAULT_API_BASE_URL);
+        setApiBaseUrlDraft(resolvedApiBaseUrl);
+
+        let restoredSession = null;
+
+        if (isFirebaseConfigured()) {
+          try {
+            const restoredUser = await waitForFirebaseAuthRestore();
+
+            if (restoredUser) {
+              restoredSession = createFirebaseSession(restoredUser, resolvedApiBaseUrl);
+            }
+          } catch (error) {
+            if (storedSession?.kind === "firebase") {
+              throw error;
+            }
+          }
+        }
+
+        if (!restoredSession && storedSession?.kind === "firebase") {
+          await clearAppSession();
+        }
+
+        if (!restoredSession && storedSession?.kind === "guest") {
+          restoredSession = storedSession;
+        }
+
+        if (!restoredSession) {
           return;
         }
 
-        setSession(storedSession);
-        setApiBaseUrlDraft(storedSession.apiBaseUrl);
-        const normalized = await loadSnapshot(storedSession, { rehydrateNotifications: true });
-        await syncPushToken(storedSession, {
+        await writeAppSession(restoredSession);
+        setSession(restoredSession);
+        const normalized = await loadSnapshot(restoredSession, { rehydrateNotifications: true });
+        await syncPushToken(restoredSession, {
           hasPushToken: normalized?.notifications?.hasPushToken,
           promptForPermission: false
         });
+
+        if (isFirebaseSession(restoredSession)) {
+          setCoachMessage(
+            restoredSession.email
+              ? `Welcome back, ${restoredSession.email}.`
+              : "Welcome back. Your coaching space is ready."
+          );
+        }
       } catch (error) {
         if (!cancelled) {
           setErrorMessage(error.message);
@@ -137,7 +223,7 @@ export default function App() {
     }
 
     const { rehydrateNotifications = false } = options;
-    const bootstrap = await fetchAppBootstrap(activeSession.apiBaseUrl, activeSession.userId);
+    const bootstrap = await fetchAppBootstrap(activeSession.apiBaseUrl, getSessionAuth(activeSession));
     const normalized = normalizeBootstrap(bootstrap);
 
     setSnapshot(normalized);
@@ -168,7 +254,7 @@ export default function App() {
 
     const result = await syncPushTokenRegistration({
       apiBaseUrl: activeSession.apiBaseUrl,
-      userId: activeSession.userId,
+      authContext: getSessionAuth(activeSession),
       hasPushToken: options.hasPushToken ?? snapshot.notifications?.hasPushToken ?? false,
       promptForPermission: options.promptForPermission ?? false
     });
@@ -210,17 +296,79 @@ export default function App() {
     }
   }
 
-  async function handleContinue() {
+  function handleChangeAuthField(field, value) {
+    setErrorMessage("");
+    setAuthDraft((current) => ({
+      ...current,
+      [field]: value
+    }));
+  }
+
+  async function handleAuthenticate() {
+    if (!isFirebaseConfigured()) {
+      setErrorMessage("Firebase is not configured yet on this device.");
+      return;
+    }
+
+    const email = authDraft.email.trim().toLowerCase();
+    const password = authDraft.password;
+
+    if (!email || !email.includes("@")) {
+      setErrorMessage("Enter a valid email address.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setErrorMessage("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (authMode === "sign_up" && password !== authDraft.confirmPassword) {
+      setErrorMessage("Password confirmation must match.");
+      return;
+    }
+
+    await runBusyAction(authMode === "sign_up" ? "Creating your account" : "Signing you in", async () => {
+      const user =
+        authMode === "sign_up"
+          ? await registerWithEmailAndPassword(email, password)
+          : await signInWithEmailPassword(email, password);
+
+      const nextSession = createFirebaseSession(user, apiBaseUrlDraft.trim() || DEFAULT_API_BASE_URL);
+
+      await writeAppSession(nextSession);
+      setSession(nextSession);
+      setApiBaseUrlDraft(nextSession.apiBaseUrl);
+      setAuthDraft(createEmptyAuthDraft());
+      setDashboardSurface("today");
+      resetTaskEditing();
+      resetComposer("");
+      setDevSessionInfo(null);
+      setCoachMessage(
+        authMode === "sign_up"
+          ? "Account created. Let's shape the first goal worth acting on."
+          : "Welcome back. Your coaching space is ready."
+      );
+
+      const normalized = await loadSnapshot(nextSession, { rehydrateNotifications: true });
+      await syncPushToken(nextSession, {
+        hasPushToken: normalized?.notifications?.hasPushToken,
+        promptForPermission: false
+      });
+    });
+  }
+
+  async function handleContinueAsGuest() {
     await runBusyAction("Preparing your guest coach", async () => {
       const nextSession = createGuestSession(apiBaseUrlDraft.trim() || DEFAULT_API_BASE_URL);
 
-      await writeGuestSession(nextSession);
+      await writeAppSession(nextSession);
       setSession(nextSession);
       setApiBaseUrlDraft(nextSession.apiBaseUrl);
 
       const seededSession = await bootstrapDemoSession(
         nextSession.apiBaseUrl,
-        nextSession.userId,
+        getSessionAuth(nextSession),
         "starter"
       );
 
@@ -237,17 +385,20 @@ export default function App() {
   }
 
   async function handleSaveApiBaseUrl() {
-    if (!session) {
-      return;
-    }
-
     await runBusyAction("Saving API base URL", async () => {
+      const nextApiBaseUrl = apiBaseUrlDraft.trim() || DEFAULT_API_BASE_URL;
+
+      if (!session) {
+        setApiBaseUrlDraft(nextApiBaseUrl);
+        return;
+      }
+
       const nextSession = {
         ...session,
-        apiBaseUrl: apiBaseUrlDraft.trim() || DEFAULT_API_BASE_URL
+        apiBaseUrl: nextApiBaseUrl
       };
 
-      await writeGuestSession(nextSession);
+      await writeAppSession(nextSession);
       setSession(nextSession);
       setCoachMessage("Saved. Future requests will use the updated API address.");
       const normalized = await loadSnapshot(nextSession, { rehydrateNotifications: true });
@@ -259,29 +410,27 @@ export default function App() {
   }
 
   function handleStartOver() {
+    const hasFirebaseSession = isFirebaseSession(session);
+
     Alert.alert(
-      "Start over?",
-      "This clears the local guest session and resets the mobile app back to its first screen.",
+      hasFirebaseSession ? "Sign out?" : "Start over?",
+      hasFirebaseSession
+        ? "This signs you out on this device and brings the app back to the authentication screen."
+        : "This clears the local guest session and resets the mobile app back to its first screen.",
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Start over",
+          text: hasFirebaseSession ? "Sign out" : "Start over",
           style: "destructive",
           onPress: async () => {
-            await clearGuestSession();
-            setSession(null);
-            setApiBaseUrlDraft(DEFAULT_API_BASE_URL);
-            setDevSessionInfo(null);
-            setSnapshot(createEmptySnapshot());
-            setGenerationScenario("ready");
-            setDashboardSurface("today");
-            resetComposer("");
-            syncNotificationDraft();
-            resetTaskEditing();
-            setErrorMessage("");
-            setCoachMessage("");
-            setPushStatusMessage("");
-            setDevLabOpen(false);
+            if (hasFirebaseSession) {
+              await signOutFromFirebase();
+            }
+
+            const nextApiBaseUrl = session?.apiBaseUrl ?? apiBaseUrlDraft;
+            await clearAppSession();
+            resetExperienceState(nextApiBaseUrl || DEFAULT_API_BASE_URL);
+            setAuthMode("sign_in");
           }
         }
       ]
@@ -296,8 +445,8 @@ export default function App() {
     await runBusyAction(`Loading ${scenario}`, async () => {
       const payload =
         scenario === "starter"
-          ? await resetDemoSession(session.apiBaseUrl, session.userId)
-          : await bootstrapDemoSession(session.apiBaseUrl, session.userId, scenario);
+          ? await resetDemoSession(session.apiBaseUrl, getSessionAuth(session))
+          : await bootstrapDemoSession(session.apiBaseUrl, getSessionAuth(session), scenario);
 
       setDevSessionInfo(payload);
       setDashboardSurface("today");
@@ -414,7 +563,7 @@ export default function App() {
     await runBusyAction("Saving reminder settings", async () => {
       await updateNotificationPreferences(
         session.apiBaseUrl,
-        session.userId,
+        getSessionAuth(session),
         buildNotificationPreferencesPayload(notificationDraft)
       );
       await loadSnapshot(session, { rehydrateNotifications: true });
@@ -449,19 +598,20 @@ export default function App() {
     }
 
     await runBusyAction("Shaping your goal", async () => {
-      const created = await createGoal(session.apiBaseUrl, session.userId, nextTitle);
-      const needsClarification = created.specificity?.state === "needs_clarification";
+      const authContext = getSessionAuth(session);
+      const createdGoal = await createGoal(session.apiBaseUrl, authContext, nextTitle);
+      const needsClarification = createdGoal.specificity?.state === "needs_clarification";
 
       setComposer((current) => ({
         ...current,
         stage: needsClarification ? "clarify" : "assessment",
-        goalId: created.goal.id,
-        title: created.goal.title,
-        specificity: created.specificity ?? null,
+        goalId: createdGoal.goal.id,
+        title: createdGoal.goal.title,
+        specificity: createdGoal.specificity ?? null,
         clarificationFields: needsClarification
-          ? toClarificationFields(created.specificity?.clarification_questions ?? [])
+          ? toClarificationFields(createdGoal.specificity?.clarification_questions ?? [])
           : [],
-        planState: created.goal.plan_state ?? "idle",
+        planState: createdGoal.goal.plan_state ?? "idle",
         plan: null,
         timeline: []
       }));
@@ -511,7 +661,7 @@ export default function App() {
 
       const result = await submitClarifications(
         session.apiBaseUrl,
-        session.userId,
+        getSessionAuth(session),
         composer.goalId,
         payload
       );
@@ -555,7 +705,7 @@ export default function App() {
   async function runPlanGeneration(goalId) {
     const initialGeneration = await generatePlan(
       session.apiBaseUrl,
-      session.userId,
+      getSessionAuth(session),
       goalId,
       generationScenario
     );
@@ -569,7 +719,7 @@ export default function App() {
 
     for (let attempt = 0; attempt < attemptCount; attempt += 1) {
       await sleep(pauseMs);
-      const status = await fetchPlanStatus(session.apiBaseUrl, session.userId, goalId);
+      const status = await fetchPlanStatus(session.apiBaseUrl, getSessionAuth(session), goalId);
 
       syncPlanStatus(status);
 
@@ -594,7 +744,8 @@ export default function App() {
     }
 
     await runBusyAction("Building your first plan", async () => {
-      await submitAssessment(session.apiBaseUrl, session.userId, composer.goalId, {
+      const authContext = getSessionAuth(session);
+      await submitAssessment(session.apiBaseUrl, authContext, composer.goalId, {
         current_level: composer.assessment.currentLevel,
         weekly_minutes_available: weeklyMinutes,
         target_date: composer.assessment.targetDate || undefined
@@ -611,7 +762,7 @@ export default function App() {
     }
 
     await runBusyAction("Checking plan status", async () => {
-      const status = await fetchPlanStatus(session.apiBaseUrl, session.userId, composer.goalId);
+      const status = await fetchPlanStatus(session.apiBaseUrl, getSessionAuth(session), composer.goalId);
       syncPlanStatus(status);
       await loadSnapshot(session);
     });
@@ -634,7 +785,8 @@ export default function App() {
     }
 
     await runBusyAction("Activating this goal", async () => {
-      await activateGoal(session.apiBaseUrl, session.userId, goalId);
+      const authContext = getSessionAuth(session);
+      await activateGoal(session.apiBaseUrl, authContext, goalId);
       await loadSnapshot(session);
       setDashboardSurface("today");
       resetTaskEditing();
@@ -649,7 +801,7 @@ export default function App() {
     }
 
     await runBusyAction("Marking task complete", async () => {
-      await completeTask(session.apiBaseUrl, session.userId, taskId, {});
+      await completeTask(session.apiBaseUrl, getSessionAuth(session), taskId, {});
       await loadSnapshot(session);
       setCoachMessage(`Nice work. "${taskTitle}" is complete and the dashboard is back in sync.`);
     });
@@ -669,7 +821,7 @@ export default function App() {
 
     await runBusyAction("Completing today", async () => {
       for (const task of pendingTasks) {
-        await completeTask(session.apiBaseUrl, session.userId, task.id, {});
+        await completeTask(session.apiBaseUrl, getSessionAuth(session), task.id, {});
       }
 
       await loadSnapshot(session);
@@ -684,7 +836,7 @@ export default function App() {
     }
 
     await runBusyAction("Skipping task", async () => {
-      await skipTask(session.apiBaseUrl, session.userId, taskId, {});
+      await skipTask(session.apiBaseUrl, getSessionAuth(session), taskId, {});
       await loadSnapshot(session);
       setCoachMessage("Skipped tasks are still signal, not failure. The dashboard is refreshed and ready for the next move.");
     });
@@ -705,7 +857,7 @@ export default function App() {
     await runBusyAction("Saving task edits", async () => {
       const result = await editTask(
         session.apiBaseUrl,
-        session.userId,
+        getSessionAuth(session),
         taskId,
         buildTaskEditPayload(taskEditDraft)
       );
@@ -723,7 +875,7 @@ export default function App() {
     }
 
     await runBusyAction("Lightening today's plan", async () => {
-      const adjusted = await softAdjustActiveGoal(session.apiBaseUrl, session.userId);
+      const adjusted = await softAdjustActiveGoal(session.apiBaseUrl, getSessionAuth(session));
       await loadSnapshot(session);
       resetTaskEditing();
       setCoachMessage(
@@ -738,7 +890,8 @@ export default function App() {
     }
 
     await runBusyAction("Adapting upcoming days", async () => {
-      const adapted = await triggerFullAdaptation(session.apiBaseUrl, session.userId, {
+      const authContext = getSessionAuth(session);
+      const adapted = await triggerFullAdaptation(session.apiBaseUrl, authContext, {
         triggered_by: "manual"
       });
       await loadSnapshot(session);
@@ -755,7 +908,7 @@ export default function App() {
     }
 
     await runBusyAction("Confirming milestone", async () => {
-      await confirmMilestone(session.apiBaseUrl, session.userId, milestoneId);
+      await confirmMilestone(session.apiBaseUrl, getSessionAuth(session), milestoneId);
       await loadSnapshot(session);
       setCoachMessage(`Milestone confirmed: "${title}". Progress is refreshed.`);
     });
@@ -793,7 +946,7 @@ export default function App() {
         <BackgroundArt />
         <LoadingScreen
           title="Opening your coaching space"
-          copy="Checking this device for a saved guest session."
+          copy="Checking this device for a saved account or preview session."
         />
       </SafeAreaView>
     );
@@ -806,10 +959,15 @@ export default function App() {
       {!session ? (
         <WelcomeScreen
           apiBaseUrl={apiBaseUrlDraft}
+          authDraft={authDraft}
+          authMode={authMode}
           busyLabel={busyLabel}
           errorMessage={errorMessage}
           onChangeApiBaseUrl={setApiBaseUrlDraft}
-          onContinue={handleContinue}
+          onChangeAuthField={handleChangeAuthField}
+          onContinueAsGuest={handleContinueAsGuest}
+          onSelectAuthMode={setAuthMode}
+          onSubmitAuth={handleAuthenticate}
         />
       ) : (
         <SessionScroll

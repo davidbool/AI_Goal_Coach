@@ -16,6 +16,7 @@ import {
 import { createConfiguredStore } from "./repositories/storeFactory.js";
 import { createObservability } from "./observability/observability.js";
 import { createAuthMiddleware } from "./server/auth.js";
+import { createFirebaseTokenVerifier, resolveFirebaseProjectId } from "./server/firebaseAuth.js";
 import { createConfiguredAiClient } from "./services/aiClientFactory.js";
 import { bootstrapDevSession, resetDevSession } from "./services/devSessionService.js";
 import { GoalService } from "./services/goalService.js";
@@ -219,6 +220,33 @@ function getObservedRoute(req) {
   return req.route?.path ?? req.path;
 }
 
+function readOptionalHeader(req, headerName) {
+  const value = req.get(headerName);
+
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function getUserOverridesFromRequest(req) {
+  const timezone = readOptionalHeader(req, "x-user-timezone");
+  const locale = readOptionalHeader(req, "x-user-locale");
+  const overrides = {};
+
+  if (timezone) {
+    overrides.timezone = timezone;
+  }
+
+  if (locale) {
+    overrides.locale = locale;
+  }
+
+  return overrides;
+}
+
 function getMockAiScenario(req) {
   const scenario = req.get("x-mock-ai-scenario");
 
@@ -233,6 +261,17 @@ function getMockAiScenario(req) {
 export function createApp(overrides = {}) {
   const defaultUserId = overrides.defaultUserId ?? "demo-user";
   const authMode = overrides.authMode ?? process.env.GOAL_COACH_AUTH_MODE ?? "dev";
+  const firebaseProjectId = resolveFirebaseProjectId({
+    projectId: overrides.firebaseProjectId
+  });
+  const tokenVerifier =
+    overrides.tokenVerifier ??
+    (firebaseProjectId ? createFirebaseTokenVerifier({ projectId: firebaseProjectId }) : null);
+
+  if (authMode === "firebase" && !tokenVerifier) {
+    throw new Error("Firebase auth mode requires FIREBASE_PROJECT_ID or an injected tokenVerifier.");
+  }
+
   const store =
     overrides.store ??
     createConfiguredStore({
@@ -294,8 +333,20 @@ export function createApp(overrides = {}) {
   });
 
   app.use("/v1", createAuthMiddleware({
-    defaultUserId: authMode === "required" ? null : defaultUserId,
-    requireAuth: authMode === "required"
+    defaultUserId: authMode === "dev" ? defaultUserId : null,
+    requireAuth: authMode === "required" || authMode === "firebase",
+    tokenVerifier,
+    allowUnverifiedBearer: authMode !== "firebase"
+  }));
+
+  app.use("/v1", route(async (req, _res, next) => {
+    if (!req.auth?.userId || typeof store.ensureUser !== "function") {
+      next();
+      return;
+    }
+
+    await store.ensureUser(req.auth.userId, getUserOverridesFromRequest(req));
+    next();
   }));
 
   app.get("/v1/ops/metrics", route(async (_req, res) => {

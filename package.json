@@ -17,6 +17,7 @@
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "express": "^5.2.1",
+    "jose": "^5.10.0",
     "zod": "^3.23.8"
   }
 }
