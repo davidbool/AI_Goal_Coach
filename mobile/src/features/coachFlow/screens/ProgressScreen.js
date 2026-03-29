@@ -23,11 +23,13 @@ export function ProgressScreen({
   notificationDraft,
   notifications,
   progress,
+  pushStatusMessage,
   today,
   onAdaptUpcomingDays,
   onChangeNotificationField,
   onConfirmMilestone,
   onCreateAnotherGoal,
+  onRegisterPushToken,
   onSaveNotifications,
   onSelectNotificationMaxPush,
   onShowToday,
@@ -37,9 +39,11 @@ export function ProgressScreen({
   const adherenceRate = progress?.adherence?.completion_rate_7d ?? progress?.adherence_7d ?? 0;
   const feedback =
     today?.feedback ?? "You are building momentum by showing up consistently instead of overloading the plan.";
-  const tokenStatusCopy = notifications?.hasPushToken
-    ? "Push is already configured for this account."
-    : "No push token is registered yet. Reminder settings will still sync with the backend.";
+  const tokenStatusCopy =
+    pushStatusMessage ||
+    (notifications?.hasPushToken
+      ? "Push is already configured for this account."
+      : "No push token is registered yet. Reminder settings will still sync with the backend.");
 
   return (
     <>
@@ -180,6 +184,15 @@ export function ProgressScreen({
           <Text style={styles.noteTitle}>Push status</Text>
           <Text style={styles.noteCopy}>{tokenStatusCopy}</Text>
         </View>
+
+        {!notifications?.hasPushToken ? (
+          <ActionButton
+            disabled={isBusy}
+            label="Register this device"
+            onPress={onRegisterPushToken}
+            tone="secondary"
+          />
+        ) : null}
 
         <ActionButton
           disabled={isBusy || !notificationDirty}

@@ -53,3 +53,4 @@
 
 ## Follow-Up Notes
 - A dev-only `SafeAreaView` deprecation warning is still visible in Expo logs. It did not block the current simulator acceptance gate because it did not change copy, state transitions, or contract alignment.
+- Live push token registration now has an explicit reminders-card action, but Expo Go on the iOS simulator still cannot provide a real remote push token. Validate that path on a physical iPhone development build during launch-hardening smoke instead of the current-cycle simulator pass.

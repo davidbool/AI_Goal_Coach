@@ -41,6 +41,7 @@
     Expected: `/v1/goals/active/adapt` creates a new plan version and preserves current locked task edits.
 11. Notifications
     Expected: token registration, preference updates, and daily reminders respect quiet hours and push caps.
+    Run this step on a physical iPhone development build because Expo Go and the iOS simulator cannot provide a live remote push token.
 12. Observability
     Expected: every API response includes `x-request-id`, failed requests include `error.request_id`, and `/v1/ops/metrics` shows request, error, plan, and reminder counters increasing.
 
