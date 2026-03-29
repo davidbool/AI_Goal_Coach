@@ -84,7 +84,7 @@ test("real AI provider fails fast until it is wired", () => {
 });
 
 test("createApp uses the configured AI provider seam", () => {
-  const { services } = createApp({ aiProvider: "mock" });
+  const { services } = createApp({ aiProvider: "mock", storeMode: "memory" });
 
   assert.ok(services.planService.aiClient instanceof MockAiClient);
   assert.ok(services.specificityService.aiClient instanceof MockAiClient);
@@ -92,7 +92,7 @@ test("createApp uses the configured AI provider seam", () => {
 
 test("createApp fails fast when real AI provider is selected too early", () => {
   assert.throws(
-    () => createApp({ aiProvider: "real" }),
+    () => createApp({ aiProvider: "real", storeMode: "memory" }),
     /AI provider "real" is not wired yet/
   );
 });

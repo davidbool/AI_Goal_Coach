@@ -37,7 +37,7 @@ test("ops metrics expose request, error, plan, and reminder instrumentation", as
   };
 
   const now = new Date("2026-03-26T12:00:00.000Z");
-  const { server } = createServer({ nowProvider: () => now, logger });
+  const { server } = createServer({ nowProvider: () => now, logger, storeMode: "memory" });
   const client = await startServer(server);
 
   t.after(async () => {

@@ -13,7 +13,7 @@ import { startServer } from "./helpers/httpTestClient.js";
 
 test("mobile API client fetches the initial bootstrap snapshot for an active goal", async (t) => {
   const now = new Date("2026-03-28T09:00:00.000Z");
-  const { server } = createServer({ nowProvider: () => now, authMode: "required" });
+  const { server } = createServer({ nowProvider: () => now, authMode: "required", storeMode: "memory" });
   const client = await startServer(server, { authUserId: "mobile-ui-user-1" });
 
   t.after(async () => {
@@ -38,7 +38,7 @@ test("mobile API client fetches the initial bootstrap snapshot for an active goa
 
 test("mobile API client returns null dashboard sections when no goal is active", async (t) => {
   const now = new Date("2026-03-28T09:00:00.000Z");
-  const { server } = createServer({ nowProvider: () => now, authMode: "required" });
+  const { server } = createServer({ nowProvider: () => now, authMode: "required", storeMode: "memory" });
   const client = await startServer(server, { authUserId: "mobile-ui-user-2" });
 
   t.after(async () => {
@@ -60,7 +60,7 @@ test("mobile API client returns null dashboard sections when no goal is active",
 
 test("mobile API client exposes effective notifications even before a preference record exists", async (t) => {
   const now = new Date("2026-03-28T09:00:00.000Z");
-  const { server } = createServer({ nowProvider: () => now, authMode: "required" });
+  const { server } = createServer({ nowProvider: () => now, authMode: "required", storeMode: "memory" });
   const client = await startServer(server, { authUserId: "mobile-ui-user-3" });
 
   t.after(async () => {
@@ -87,7 +87,7 @@ test("mobile API client exposes effective notifications even before a preference
 
 test("mobile API client edits pending tasks and refreshes into the next adapted plan version", async (t) => {
   const now = new Date("2026-03-28T09:00:00.000Z");
-  const { server } = createServer({ nowProvider: () => now, authMode: "required" });
+  const { server } = createServer({ nowProvider: () => now, authMode: "required", storeMode: "memory" });
   const client = await startServer(server, { authUserId: "mobile-ui-user-4" });
 
   t.after(async () => {

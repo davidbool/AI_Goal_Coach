@@ -25,7 +25,7 @@ async function waitForReadyPlan(client, goalId, attempts = 20) {
 
 test("all MVP routes exist and return contract-safe mock payloads", async (t) => {
   const now = new Date("2026-03-26T12:00:00.000Z");
-  const { server } = createServer({ nowProvider: () => now });
+  const { server } = createServer({ nowProvider: () => now, storeMode: "memory" });
   const client = await startServer(server);
 
   t.after(async () => {
@@ -219,7 +219,7 @@ test("all MVP routes exist and return contract-safe mock payloads", async (t) =>
 
 test("goal and task routes reject resource access for another user", async (t) => {
   const now = new Date("2026-03-26T12:00:00.000Z");
-  const { server } = createServer({ nowProvider: () => now });
+  const { server } = createServer({ nowProvider: () => now, storeMode: "memory" });
   const client = await startServer(server);
 
   t.after(async () => {
@@ -262,7 +262,7 @@ test("goal and task routes reject resource access for another user", async (t) =
 
 test("required auth mode rejects missing or malformed authorization headers", async (t) => {
   const now = new Date("2026-03-26T12:00:00.000Z");
-  const { server } = createServer({ nowProvider: () => now, authMode: "required" });
+  const { server } = createServer({ nowProvider: () => now, authMode: "required", storeMode: "memory" });
   const client = await startServer(server, { authUserId: null });
 
   t.after(async () => {
