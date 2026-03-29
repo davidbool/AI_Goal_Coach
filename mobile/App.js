@@ -45,6 +45,7 @@ import {
   validateNotificationDraft,
   validateTaskEditDraft
 } from "./src/features/coachFlow/model.js";
+import { syncPushTokenRegistration } from "./src/services/pushTokenService.js";
 import { DeveloperLab } from "./src/features/coachFlow/screens/DeveloperLab.js";
 import { WelcomeScreen } from "./src/features/coachFlow/screens/WelcomeScreen.js";
 import {
@@ -65,6 +66,7 @@ export default function App() {
   const [snapshot, setSnapshot] = useState(createEmptySnapshot());
   const [notificationDraft, setNotificationDraft] = useState(createNotificationDraft());
   const [notificationDirty, setNotificationDirty] = useState(false);
+  const [pushStatusMessage, setPushStatusMessage] = useState("");
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [taskEditDraft, setTaskEditDraft] = useState(createEmptyTaskEditDraft());
   const [composer, setComposer] = useState(createEmptyComposer());
@@ -106,7 +108,11 @@ export default function App() {
 
         setSession(storedSession);
         setApiBaseUrlDraft(storedSession.apiBaseUrl);
-        await loadSnapshot(storedSession, { rehydrateNotifications: true });
+        const normalized = await loadSnapshot(storedSession, { rehydrateNotifications: true });
+        await syncPushToken(storedSession, {
+          hasPushToken: normalized?.notifications?.hasPushToken,
+          promptForPermission: false
+        });
       } catch (error) {
         if (!cancelled) {
           setErrorMessage(error.message);
@@ -127,7 +133,7 @@ export default function App() {
 
   async function loadSnapshot(activeSession = session, options = {}) {
     if (!activeSession) {
-      return;
+      return null;
     }
 
     const { rehydrateNotifications = false } = options;
@@ -135,6 +141,10 @@ export default function App() {
     const normalized = normalizeBootstrap(bootstrap);
 
     setSnapshot(normalized);
+
+    if (normalized.notifications?.hasPushToken) {
+      setPushStatusMessage("");
+    }
 
     const editingTaskStillPending = normalized.today?.tasks?.some(
       (task) => task.id === editingTaskId && task.state === "pending"
@@ -147,6 +157,37 @@ export default function App() {
     if (rehydrateNotifications || !notificationDirtyRef.current) {
       syncNotificationDraft(normalized.notifications);
     }
+
+    return normalized;
+  }
+
+  async function syncPushToken(activeSession = session, options = {}) {
+    if (!activeSession) {
+      return null;
+    }
+
+    const result = await syncPushTokenRegistration({
+      apiBaseUrl: activeSession.apiBaseUrl,
+      userId: activeSession.userId,
+      hasPushToken: options.hasPushToken ?? snapshot.notifications?.hasPushToken ?? false,
+      promptForPermission: options.promptForPermission ?? false
+    });
+
+    if (result.outcome === "registered") {
+      await loadSnapshot(activeSession, { rehydrateNotifications: true });
+
+      if (options.showMessage) {
+        setCoachMessage("Push is configured for this device, and reminder delivery can use the saved token.");
+      }
+
+      return result;
+    }
+
+    if (options.showMessage && result.message) {
+      setPushStatusMessage(result.message);
+    }
+
+    return result;
   }
 
   function resetComposer(nextTitle = "") {
@@ -187,7 +228,11 @@ export default function App() {
       setDashboardSurface("today");
       setCoachMessage("Your local guest workspace is ready. Let's define one goal worth acting on.");
       resetComposer("");
-      await loadSnapshot(nextSession, { rehydrateNotifications: true });
+      const normalized = await loadSnapshot(nextSession, { rehydrateNotifications: true });
+      await syncPushToken(nextSession, {
+        hasPushToken: normalized?.notifications?.hasPushToken,
+        promptForPermission: false
+      });
     });
   }
 
@@ -205,7 +250,11 @@ export default function App() {
       await writeGuestSession(nextSession);
       setSession(nextSession);
       setCoachMessage("Saved. Future requests will use the updated API address.");
-      await loadSnapshot(nextSession, { rehydrateNotifications: true });
+      const normalized = await loadSnapshot(nextSession, { rehydrateNotifications: true });
+      await syncPushToken(nextSession, {
+        hasPushToken: normalized?.notifications?.hasPushToken,
+        promptForPermission: false
+      });
     });
   }
 
@@ -231,6 +280,7 @@ export default function App() {
             resetTaskEditing();
             setErrorMessage("");
             setCoachMessage("");
+            setPushStatusMessage("");
             setDevLabOpen(false);
           }
         }
@@ -369,6 +419,20 @@ export default function App() {
       );
       await loadSnapshot(session, { rehydrateNotifications: true });
       setCoachMessage("Reminders saved. The dashboard is back in sync with your latest schedule.");
+    });
+  }
+
+  async function handleRegisterPushToken() {
+    if (!session) {
+      return;
+    }
+
+    await runBusyAction("Registering this device for push", async () => {
+      setPushStatusMessage("");
+      await syncPushToken(session, {
+        promptForPermission: true,
+        showMessage: true
+      });
     });
   }
 
@@ -759,6 +823,7 @@ export default function App() {
             editingTaskId={editingTaskId}
             notificationDirty={notificationDirty}
             notificationDraft={notificationDraft}
+            pushStatusMessage={pushStatusMessage}
             snapshot={snapshot}
             taskEditDraft={taskEditDraft}
             isBusy={isBusy}
@@ -780,6 +845,7 @@ export default function App() {
             onCreateGoal={handleCreateGoal}
             onRefreshGenerationStatus={handleRefreshGenerationStatus}
             onRefreshSnapshot={handleRefreshSnapshot}
+            onRegisterPushToken={handleRegisterPushToken}
             onRetryGeneration={handleRetryGeneration}
             onSaveNotifications={handleSaveNotifications}
             onSaveTaskEdit={handleSaveTaskEditing}

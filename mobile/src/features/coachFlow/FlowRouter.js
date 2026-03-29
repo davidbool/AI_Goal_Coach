@@ -14,6 +14,7 @@ export function FlowRouter({
   editingTaskId,
   notificationDirty,
   notificationDraft,
+  pushStatusMessage,
   snapshot,
   taskEditDraft,
   isBusy,
@@ -35,6 +36,7 @@ export function FlowRouter({
   onCreateAnotherGoal,
   onRefreshGenerationStatus,
   onRefreshSnapshot,
+  onRegisterPushToken,
   onRetryGeneration,
   onSaveNotifications,
   onSaveTaskEdit,
@@ -132,11 +134,13 @@ export function FlowRouter({
         notificationDraft={notificationDraft}
         notifications={snapshot.notifications}
         progress={snapshot.progress}
+        pushStatusMessage={pushStatusMessage}
         today={snapshot.today}
         onAdaptUpcomingDays={onAdaptUpcomingDays}
         onChangeNotificationField={onChangeNotificationField}
         onConfirmMilestone={onConfirmMilestone}
         onCreateAnotherGoal={onCreateAnotherGoal}
+        onRegisterPushToken={onRegisterPushToken}
         onSaveNotifications={onSaveNotifications}
         onSelectNotificationMaxPush={onSelectNotificationMaxPush}
         onShowToday={onShowToday}
