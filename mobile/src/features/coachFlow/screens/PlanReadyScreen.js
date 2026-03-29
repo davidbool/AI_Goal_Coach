@@ -17,8 +17,8 @@ export function PlanReadyScreen({ composer, isBusy, onActivate, onBackToGoals })
   return (
     <>
       <HeroPanel
-        eyebrow="Plan ready"
-        title={presentation.title}
+        eyebrow="Goal plan"
+        title={composer.title}
         copy={presentation.heroCopy}
       >
         <View style={styles.heroStatRow}>
@@ -30,10 +30,13 @@ export function PlanReadyScreen({ composer, isBusy, onActivate, onBackToGoals })
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Plan snapshot</Text>
         <View style={styles.metricGrid}>
-          <MetricTile label="Frame" value={humanizeToken(composer.plan?.frame_type ?? "custom")} />
+          <MetricTile label="Estimated time" value={formatEstimate(composer.plan?.estimate)} />
           <MetricTile label="Feasibility" value={humanizeToken(composer.plan?.feasibility ?? "realistic")} />
-          <MetricTile label="Estimate" value={formatEstimate(composer.plan?.estimate)} />
-          <MetricTile label="Confidence" value={formatPercent(composer.plan?.estimate?.confidence ?? 0)} />
+          <MetricTile label="Frame" value={humanizeToken(composer.plan?.frame_type ?? "custom")} />
+          <MetricTile
+            label="Confidence"
+            value={formatPercent(composer.plan?.estimate?.confidence ?? 0)}
+          />
         </View>
       </View>
 

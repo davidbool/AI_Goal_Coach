@@ -16,7 +16,7 @@ export function GenerationFailedScreen({ composer, isBusy, onBack, onRetry }) {
   return (
     <>
       <HeroPanel
-        eyebrow="Plan failed"
+        eyebrow="Goal plan"
         title={presentation.title}
         copy={presentation.heroCopy}
       >

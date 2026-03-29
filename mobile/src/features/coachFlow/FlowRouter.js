@@ -6,9 +6,11 @@ import { GeneratingScreen } from "./screens/GeneratingScreen.js";
 import { PlanReadyScreen } from "./screens/PlanReadyScreen.js";
 import { GenerationFailedScreen } from "./screens/GenerationFailedScreen.js";
 import { DashboardScreen } from "./screens/DashboardScreen.js";
+import { ProgressScreen } from "./screens/ProgressScreen.js";
 
 export function FlowRouter({
   composer,
+  dashboardSurface,
   editingTaskId,
   notificationDirty,
   notificationDraft,
@@ -27,6 +29,7 @@ export function FlowRouter({
   onClarificationChange,
   onBeginTaskEdit,
   onCompleteTask,
+  onCompleteToday,
   onConfirmMilestone,
   onCreateGoal,
   onCreateAnotherGoal,
@@ -37,6 +40,8 @@ export function FlowRouter({
   onSaveTaskEdit,
   onSelectGoalPrompt,
   onSelectNotificationMaxPush,
+  onShowProgress,
+  onShowToday,
   onSkipTask,
   onSoftAdjust,
   onSubmitClarifications,
@@ -117,34 +122,47 @@ export function FlowRouter({
     );
   }
 
+  if (dashboardSurface === "progress") {
+    return (
+      <ProgressScreen
+        activeGoal={snapshot.activeGoal}
+        goals={snapshot.goals}
+        isBusy={isBusy}
+        notificationDirty={notificationDirty}
+        notificationDraft={notificationDraft}
+        notifications={snapshot.notifications}
+        progress={snapshot.progress}
+        today={snapshot.today}
+        onAdaptUpcomingDays={onAdaptUpcomingDays}
+        onChangeNotificationField={onChangeNotificationField}
+        onConfirmMilestone={onConfirmMilestone}
+        onCreateAnotherGoal={onCreateAnotherGoal}
+        onSaveNotifications={onSaveNotifications}
+        onSelectNotificationMaxPush={onSelectNotificationMaxPush}
+        onShowToday={onShowToday}
+        onSwitchGoal={onSwitchGoal}
+      />
+    );
+  }
+
   return (
     <DashboardScreen
       activeGoal={snapshot.activeGoal}
       editingTaskId={editingTaskId}
-      goals={snapshot.goals}
       isBusy={isBusy}
-      localDateKey={snapshot.localDateKey}
-      notificationDirty={notificationDirty}
-      notificationDraft={notificationDraft}
-      notifications={snapshot.notifications}
       progress={snapshot.progress}
       taskEditDraft={taskEditDraft}
       today={snapshot.today}
-      onAdaptUpcomingDays={onAdaptUpcomingDays}
       onBeginTaskEdit={onBeginTaskEdit}
       onCancelTaskEdit={onCancelTaskEdit}
-      onChangeNotificationField={onChangeNotificationField}
       onChangeTaskEditField={onChangeTaskEditField}
       onCompleteTask={onCompleteTask}
-      onConfirmMilestone={onConfirmMilestone}
-      onCreateAnotherGoal={onCreateAnotherGoal}
+      onCompleteToday={onCompleteToday}
       onRefresh={onRefreshSnapshot}
-      onSaveNotifications={onSaveNotifications}
       onSaveTaskEdit={onSaveTaskEdit}
-      onSelectNotificationMaxPush={onSelectNotificationMaxPush}
+      onShowProgress={onShowProgress}
       onSkipTask={onSkipTask}
       onSoftAdjust={onSoftAdjust}
-      onSwitchGoal={onSwitchGoal}
     />
   );
 }

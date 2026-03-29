@@ -31,19 +31,19 @@ export function WelcomeScreen({
       >
         <HeroPanel
           eyebrow="AI Goal Coach"
-          title="Turn a long-term goal into a calmer daily rhythm."
-          copy="This first mobile pass runs in guest mode so we can validate the iOS flow quickly. Start here, shape one goal, and let the coach build a realistic first plan."
+          title="Calm daily coaching for one meaningful goal."
+          copy="This Expo build starts in guest mode so we can validate the mobile flow quickly. Set one goal, let the AI create a realistic plan, and keep the interface focused on what matters today."
         >
           <View style={styles.heroStatRow}>
-            <HeroBadge label="Mode" value="Guest / local" />
-            <HeroBadge label="Platform" value="iOS-first" />
+            <HeroBadge label="Theme" value="Bright / clear" />
+            <HeroBadge label="Mode" value="Guest preview" />
           </View>
         </HeroPanel>
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Continue as a guest</Text>
           <Text style={styles.mutedCopy}>
-            We will create a guest user on this device, keep its ID in local storage, and seed a clean starter state so the full intake flow is ready.
+            We will create a local guest session on this device and seed a clean coaching state so the onboarding and plan screens are ready right away.
           </Text>
           <Text style={styles.fieldLabel}>API base URL</Text>
           <TextInput
@@ -52,7 +52,7 @@ export function WelcomeScreen({
             keyboardType="url"
             onChangeText={onChangeApiBaseUrl}
             placeholder="http://127.0.0.1:3000"
-            placeholderTextColor="#8B7E73"
+            placeholderTextColor="#8A95A7"
             style={styles.input}
             value={apiBaseUrl}
           />
@@ -62,7 +62,7 @@ export function WelcomeScreen({
           {errorMessage ? <ErrorBanner message={errorMessage} /> : null}
           <ActionButton
             disabled={isBusy}
-            label={isBusy ? busyLabel : "Continue"}
+            label={isBusy ? busyLabel : "Open my coach"}
             onPress={onContinue}
             tone="primary"
           />

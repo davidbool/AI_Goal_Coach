@@ -16,7 +16,7 @@ export function GeneratingScreen({ composer, isBusy, onCancel, onRefreshStatus }
   return (
     <>
       <HeroPanel
-        eyebrow="Step 4"
+        eyebrow="Goal plan"
         title={presentation.title}
         copy={presentation.heroCopy}
       >

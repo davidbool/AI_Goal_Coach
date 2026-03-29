@@ -46,19 +46,23 @@ export function SessionScroll({ busyLabel, coachMessage, errorMessage, children 
 export function LoadingScreen({ copy, title }) {
   return (
     <View style={styles.loadingWrap}>
-      <ActivityIndicator size="large" color="#B65C3A" />
+      <ActivityIndicator size="large" color="#5B7CFA" />
       <Text style={styles.loadingTitle}>{title}</Text>
       <Text style={styles.loadingCopy}>{copy}</Text>
     </View>
   );
 }
 
+export function Card({ children, style }) {
+  return <View style={[styles.card, style]}>{children}</View>;
+}
+
 export function HeroPanel({ eyebrow, title, copy, children }) {
   return (
     <View style={styles.heroCard}>
-      <Text style={styles.eyebrow}>{eyebrow}</Text>
+      {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
       <Text style={styles.heroTitle}>{title}</Text>
-      <Text style={styles.heroCopy}>{copy}</Text>
+      {copy ? <Text style={styles.heroCopy}>{copy}</Text> : null}
       {children}
     </View>
   );
@@ -98,6 +102,37 @@ export function StepRail({ currentStep }) {
   );
 }
 
+export function SegmentedControl({ options, value, onChange }) {
+  return (
+    <View style={styles.segmentedControl}>
+      {options.map((option) => {
+        const isActive = option.value === value;
+
+        return (
+          <Pressable
+            key={option.value}
+            onPress={() => onChange(option.value)}
+            style={({ pressed }) => [
+              styles.segmentedItem,
+              isActive ? styles.segmentedItemActive : null,
+              pressed && !isActive ? styles.buttonPressed : null
+            ]}
+          >
+            <Text
+              style={[
+                styles.segmentedLabel,
+                isActive ? styles.segmentedLabelActive : null
+              ]}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 export function GoalRow({
   actionLabel,
   compactAction = false,
@@ -119,6 +154,95 @@ export function GoalRow({
         onPress={onPress}
         tone={disabled ? "muted" : "secondary"}
       />
+    </View>
+  );
+}
+
+function TextLinkButton({ danger = false, disabled, label, onPress }) {
+  return (
+    <Pressable disabled={disabled} onPress={onPress}>
+      <Text style={[styles.textLink, danger ? styles.textLinkDanger : null]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+export function TaskItem({
+  disabled = false,
+  isDone = false,
+  meta,
+  onEdit,
+  onSkip,
+  onToggle,
+  title
+}) {
+  return (
+    <View style={[styles.taskItem, isDone ? styles.taskItemDone : null]}>
+      <Pressable
+        disabled={disabled || isDone}
+        onPress={onToggle}
+        style={({ pressed }) => [
+          styles.taskCheckbox,
+          isDone ? styles.taskCheckboxDone : null,
+          pressed && !disabled && !isDone ? styles.buttonPressed : null
+        ]}
+      >
+        <Text
+          style={[
+            styles.taskCheckboxGlyph,
+            isDone ? styles.taskCheckboxGlyphDone : null
+          ]}
+        >
+          ✓
+        </Text>
+      </Pressable>
+      <View style={styles.taskItemContent}>
+        <Text style={[styles.taskItemTitle, isDone ? styles.taskItemTitleDone : null]}>{title}</Text>
+        {meta ? <Text style={styles.taskItemMeta}>{meta}</Text> : null}
+        {!isDone && (onEdit || onSkip) ? (
+          <View style={styles.taskItemActionRow}>
+            {onEdit ? (
+              <TextLinkButton disabled={disabled} label="Edit" onPress={onEdit} />
+            ) : null}
+            {onSkip ? (
+              <TextLinkButton danger disabled={disabled} label="Skip" onPress={onSkip} />
+            ) : null}
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+export function ProgressBar({ progress }) {
+  const safeProgress = Math.max(0, Math.min(1, progress ?? 0));
+  const fillWidth = safeProgress === 0 ? "0%" : `${Math.max(6, Math.round(safeProgress * 100))}%`;
+
+  return (
+    <View style={styles.progressBarTrack}>
+      <View style={[styles.progressBarFill, { width: fillWidth }]} />
+    </View>
+  );
+}
+
+export function ChatBubble({ role = "assistant", text, children }) {
+  const isUser = role === "user";
+
+  return (
+    <View style={[styles.chatMessageRow, isUser ? styles.chatMessageRowUser : null]}>
+      <View
+        style={[
+          styles.chatBubble,
+          isUser ? styles.chatBubbleUser : styles.chatBubbleAssistant
+        ]}
+      >
+        {text ? (
+          <Text style={[styles.chatBubbleText, isUser ? styles.chatBubbleTextUser : null]}>
+            {text}
+          </Text>
+        ) : (
+          children
+        )}
+      </View>
     </View>
   );
 }
@@ -163,7 +287,10 @@ export function TaskCard({
           <View style={styles.taskMetaRow}>
             <StatusChip label={`${getTaskMinutes(task)} min`} tone="neutral" />
             <StatusChip label={humanizeToken(task.difficulty)} tone={task.difficulty} />
-            <StatusChip label={task.required ? "Required" : "Flexible"} tone={task.required ? "required" : "neutral"} />
+            <StatusChip
+              label={task.required ? "Required" : "Flexible"}
+              tone={task.required ? "required" : "neutral"}
+            />
           </View>
           {preservationIndicator ? (
             <Text style={styles.helperLine}>{preservationIndicator.copy}</Text>
@@ -206,7 +333,7 @@ export function TaskCard({
               editable={!disabled}
               onChangeText={(value) => onChangeEditField("title", value)}
               placeholder="Task title"
-              placeholderTextColor="#8B7E73"
+              placeholderTextColor="#8A95A7"
               style={styles.input}
               value={draft.title}
             />
@@ -218,7 +345,7 @@ export function TaskCard({
               keyboardType="number-pad"
               onChangeText={(value) => onChangeEditField("estMinutes", value)}
               placeholder="25"
-              placeholderTextColor="#8B7E73"
+              placeholderTextColor="#8A95A7"
               style={styles.input}
               value={draft.estMinutes}
             />
@@ -255,7 +382,7 @@ export function TaskCard({
             </View>
           </View>
           <Text style={styles.helperLine}>
-            Saving manual edits preserves this task during future adaptation.
+            Saving manual edits keeps this task stable during future plan updates.
           </Text>
           <View style={styles.inlineActionRow}>
             <View style={styles.inlineActionItem}>
@@ -355,7 +482,9 @@ export function MetricTile({ label, value }) {
 export function StatusChip({ label, tone }) {
   return (
     <View style={[styles.statusChip, toneStyles[tone] ?? toneStyles.neutral]}>
-      <Text style={[styles.statusChipText, toneTextStyles[tone] ?? toneTextStyles.neutral]}>{label}</Text>
+      <Text style={[styles.statusChipText, toneTextStyles[tone] ?? toneTextStyles.neutral]}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -398,7 +527,9 @@ export function ChoicePill({ active, disabled = false, label, onPress }) {
         pressed && !disabled ? styles.buttonPressed : null
       ]}
     >
-      <Text style={[styles.choicePillText, active ? styles.choicePillTextActive : null]}>{label}</Text>
+      <Text style={[styles.choicePillText, active ? styles.choicePillTextActive : null]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -422,7 +553,7 @@ export function ErrorBanner({ message }) {
 export function BusyNotice({ label }) {
   return (
     <View style={styles.busyFooter}>
-      <ActivityIndicator size="small" color="#B65C3A" />
+      <ActivityIndicator size="small" color="#5B7CFA" />
       <Text style={styles.busyText}>{label}</Text>
     </View>
   );
